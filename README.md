@@ -54,6 +54,9 @@ Ein professionelles IoT-System für den ESP32-C3, das Bluetooth-Geräte scannt, 
 - **Merge-Import-Logic**: Konfliktfreie Imports ohne Duplikate
 - **Backup-Validation**: JSON-Schema-Validierung vor Import
 
+## 📸 Screenshot
+![Screenshot Main-Page][screenhot_20251005.png]
+
 ## 📋 Hardware-Spezifikationen
 
 ### ESP32-C3 DevKitM-1 System Requirements
