@@ -55,7 +55,7 @@ Ein professionelles IoT-System für den ESP32-C3, das Bluetooth-Geräte scannt, 
 - **Backup-Validation**: JSON-Schema-Validierung vor Import
 
 ## 📸 Screenshot
-![Screenshot Main-Page](screenhot_20251005.png)
+![Screenshot Main-Page](./screenhot.png)
 
 ## 📋 Hardware-Spezifikationen
 
