@@ -6,11 +6,15 @@
 #include "WiFiManager.h"
 
 WiFiManager::WiFiManager() 
-    : isInSecureMode(false), buttonPressStart(0), buttonPressed(false), useStaticIP(false) {
+    : isInSecureMode(false), buttonPressStart(0), buttonPressed(false), useStaticIP(false), dnsServer(nullptr) {
 }
 
 WiFiManager::~WiFiManager() {
-    // Nothing to cleanup
+    if (dnsServer) {
+        dnsServer->stop();
+        delete dnsServer;
+        dnsServer = nullptr;
+    }
 }
 
 bool WiFiManager::begin() {
@@ -40,7 +44,7 @@ bool WiFiManager::connectToWiFi() {
     // Konfiguriere statische IP falls aktiviert
     if (useStaticIP) {
         if (!WiFi.config(staticIP, gateway, subnet, dns)) {
-            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+            
             useStaticIP = false;
         }
     }
@@ -56,6 +60,15 @@ bool WiFiManager::connectToWiFi() {
     
     if (WiFi.status() == WL_CONNECTED) {
         isInSecureMode = true;
+        
+        // Stop DNS Server when connected to WiFi
+        if (dnsServer) {
+            dnsServer->stop();
+            delete dnsServer;
+            dnsServer = nullptr;
+            
+        }
+        
         return true;
     }
     
@@ -74,6 +87,15 @@ bool WiFiManager::startAccessPoint(const String& apPassword) {
         // Open AP for initial setup
         success = WiFi.softAP(WIFI_MANAGER_AP_NAME);
         isInSecureMode = false;
+    }
+    
+    if (success) {
+        // Start DNS Server for Captive Portal
+        if (!dnsServer) {
+            dnsServer = new DNSServer();
+        }
+        dnsServer->start(53, "*", WiFi.softAPIP());
+        
     }
     
     return success;
@@ -200,14 +222,21 @@ void WiFiManager::loadSettings() {
 
 bool WiFiManager::connectToWiFi(const String& ssid, const String& password) {
     if (ssid.length() == 0) {
-        Serial.println("WiFi: Leere SSID");
+        
         return false;
     }
     
     // Speichere Credentials
     if (!saveWiFiCredentials(ssid, password)) {
-        Serial.println("WiFi: Fehler beim Speichern der Credentials");
+        
         return false;
+    }
+    
+    // Stop DNS Server before switching to STA mode
+    if (dnsServer) {
+        dnsServer->stop();
+        delete dnsServer;
+        dnsServer = nullptr;
     }
     
     // Versuche Verbindung
@@ -216,27 +245,27 @@ bool WiFiManager::connectToWiFi(const String& ssid, const String& password) {
     // Konfiguriere statische IP falls aktiviert
     if (useStaticIP) {
         if (!WiFi.config(staticIP, gateway, subnet, dns)) {
-            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+            
         }
     }
     
     WiFi.begin(ssid.c_str(), password.c_str());
     
-    Serial.println("WiFi: Verbinde mit " + ssid + "...");
+    
     
     unsigned long startTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < WIFI_TIMEOUT_MS) {
         delay(100);
-        Serial.print(".");
+        
     }
-    Serial.println();
+    
     
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("WiFi: Verbunden! IP: " + WiFi.localIP().toString());
+        
         isInSecureMode = true;
         return true;
     } else {
-        Serial.println("WiFi: Verbindung fehlgeschlagen");
+        
         // Fallback zum AP-Modus
         startAccessPoint("");
         return false;
@@ -245,21 +274,28 @@ bool WiFiManager::connectToWiFi(const String& ssid, const String& password) {
 
 bool WiFiManager::connectToWiFi(const String& ssid, const String& password, const String& ip, const String& gateway, const String& subnet, const String& dns) {
     if (ssid.length() == 0) {
-        Serial.println("WiFi: Leere SSID");
+        
         return false;
     }
     
     // Speichere Credentials
     if (!saveWiFiCredentials(ssid, password)) {
-        Serial.println("WiFi: Fehler beim Speichern der Credentials");
+        
         return false;
     }
     
     // Speichere statische IP Config
     if (ip.length() > 0 && gateway.length() > 0) {
         if (!saveStaticIPConfig(ip, gateway, subnet, dns)) {
-            Serial.println("WiFi: Fehler beim Speichern der statischen IP");
+            
         }
+    }
+    
+    // Stop DNS Server before switching to STA mode
+    if (dnsServer) {
+        dnsServer->stop();
+        delete dnsServer;
+        dnsServer = nullptr;
     }
     
     // Versuche Verbindung
@@ -268,29 +304,29 @@ bool WiFiManager::connectToWiFi(const String& ssid, const String& password, cons
     // Konfiguriere statische IP
     if (useStaticIP) {
         if (!WiFi.config(staticIP, this->gateway, this->subnet, this->dns)) {
-            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+            
         } else {
-            Serial.println("WiFi: Statische IP konfiguriert - " + staticIP.toString());
+            
         }
     }
     
     WiFi.begin(ssid.c_str(), password.c_str());
     
-    Serial.println("WiFi: Verbinde mit " + ssid + "...");
+    
     
     unsigned long startTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < WIFI_TIMEOUT_MS) {
         delay(100);
-        Serial.print(".");
+        
     }
-    Serial.println();
+    
     
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("WiFi: Verbunden! IP: " + WiFi.localIP().toString());
+        
         isInSecureMode = true;
         return true;
     } else {
-        Serial.println("WiFi: Verbindung fehlgeschlagen");
+        
         // Fallback zum AP-Modus
         startAccessPoint("");
         return false;
@@ -299,24 +335,24 @@ bool WiFiManager::connectToWiFi(const String& ssid, const String& password, cons
 
 bool WiFiManager::setAPPassword(const String& password) {
     if (password.length() < 8) {
-        Serial.println("WiFi: AP-Passwort zu kurz (min. 8 Zeichen)");
+        
         return false;
     }
     
     if (!saveAPPassword(password)) {
-        Serial.println("WiFi: Fehler beim Speichern des AP-Passworts");
+        
         return false;
     }
     
     savedAPPassword = password;
     isInSecureMode = true;
     
-    Serial.println("WiFi: AP-Passwort gesetzt");
+    
     return true;
 }
 
 void WiFiManager::resetWiFiSettings() {
-    Serial.println("WiFi: Setze alle Einstellungen zurueck");
+    
     
     preferences.begin("wifi", false);
     preferences.clear();
@@ -337,8 +373,7 @@ void WiFiManager::updateSecurityStatus() {
     // 2. AP-Modus mit Passwort läuft
     isInSecureMode = isConnected() || (!savedAPPassword.isEmpty());
     
-    Serial.print("WiFi: Sicherheitsstatus aktualisiert - ");
-    Serial.println(isInSecureMode ? "SICHER" : "UNSICHER");
+    
 }
 
 bool WiFiManager::saveStaticIPConfig(const String& ip, const String& gateway, const String& subnet, const String& dns) {
@@ -358,7 +393,7 @@ bool WiFiManager::saveStaticIPConfig(const String& ip, const String& gateway, co
     this->subnet.fromString(subnet.length() > 0 ? subnet : "255.255.255.0");
     this->dns.fromString(dns.length() > 0 ? dns : "8.8.8.8");
     
-    Serial.println("WiFi: Statische IP gespeichert - " + ip);
+    
     return true;
 }
 
@@ -375,5 +410,12 @@ void WiFiManager::clearStaticIPConfig() {
     
     useStaticIP = false;
     
-    Serial.println("WiFi: Statische IP Konfiguration gelöscht");
+    
+}
+
+void WiFiManager::loop() {
+    // Process DNS requests when in AP mode
+    if (dnsServer && isInAPMode()) {
+        dnsServer->processNextRequest();
+    }
 }

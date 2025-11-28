@@ -20,7 +20,7 @@
 #define WIFI_TIMEOUT_MS 10000
 #define WIFI_MANAGER_AP_NAME "ESP32-BT-Scanner"
 // Kein Passwort für einfaches Setup!
-#define WIFI_RESET_BUTTON_PIN 0  // Boot-Button für WiFi-Reset
+#define WIFI_RESET_BUTTON_PIN 9  // Boot-Button (ESP32-C3 DevKitM-1) für WiFi-Reset
 #define WIFI_RESET_BUTTON_DURATION_MS 3000  // 3 Sekunden halten für Reset
 
 // WiFiManager Optimierungen für Stabilität

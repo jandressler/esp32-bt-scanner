@@ -3,10 +3,10 @@
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-ready-orange)](https://platformio.org/)
 [![ESP32-C3](https://img.shields.io/badge/ESP32-C3-blue)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![RAM Usage](https://img.shields.io/badge/RAM-21.0%25-green)](docs/performance.md)
-[![Flash Usage](https://img.shields.io/badge/Flash-47.7%25-yellow)](docs/performance.md)
+[![RAM Usage](https://img.shields.io/badge/RAM-27.2%25-green)](docs/performance.md)
+[![Flash Usage](https://img.shields.io/badge/Flash-47.5%25-yellow)](docs/performance.md)
 
-Ein professionelles IoT-System für den ESP32-C3, das Bluetooth-Geräte scannt, eine moderne Web-Oberfläche bereitstellt und als Gateway für Home Automation Systeme wie Loxone fungiert. Entwickelt für 24/7-Betrieb mit robusten Sicherheits- und Monitoring-Features.
+Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche und einfachen HTTP-Integrationen (z.B. Loxone). Speicher-statisch, ohne serielle Laufzeit-Logs.
 
 ## 🎯 Hauptfunktionen
 ### 🌐 Modernes Web-Interface
@@ -15,72 +15,21 @@ Ein professionelles IoT-System für den ESP32-C3, das Bluetooth-Geräte scannt, 
 - **Moderne Oberfläche**: Schlanke UI mit klarer Typografie
 - **Dialog-Overlays**: Geräteverwaltung mit RSSI-Threshold-Einstellung
 - **Payload-Hex-Dump**: Vollständige BLE-Advertising-Daten für Entwickler
+
+### 📊 Geräteverwaltung
+- **Aktive Geräte**: Bis zu 32 gleichzeitig gescannte BLE-Geräte (LRU-Ersetzung)
+- **Bekannte Geräte**: Bis zu 200 persistente Geräte mit Kommentaren (32 Zeichen)
+- **RSSI-Schwellenwerte**: Individuell pro Gerät einstellbar (-60 bis -90 dBm)
+- **Timeout**: 2 Minuten ohne Signal = automatisch inaktiv
 ### 💾 Backup & Restore
 - **JSON-Export**: Download der bekannten Geräte
 - **Import**: Browser-native File-API
 - **Konfliktfrei**: Bestehende Geräte werden aktualisiert
 - **Validierung**: Basis-JSON-Parsing ohne Schema-Validierung
-- **Hardware WiFi-Reset**: Boot-Button 3s drücken → komplettes Reset
-### 📊 System Status API
-  "wifi": {
-    "connected": true,
-    "ssid": "HomeNetwork",
-    "ip": "192.168.1.100",
-    "rssi": -45,
-    "gateway": "192.168.1.1",
-    "subnet": "255.255.255.0",
-    "dns": "8.8.8.8"
-  },
-- **API-basiertes Reset**: Remote-Management über `/api/system/reset`
-### 📝 Output Log API
-POST /api/output-log/clear    # Log löschen
-POST /api/output-log/test     # Test-Eintrag erstellen
+- **Hardware WiFi-Reset**: Boot-Button (GPIO9) 3s drücken → WiFi-Credentials löschen
 
-### 💾 Backup & Restore API
-GET  /api/export-devices-file
-Content-Type: application/json
-Content-Disposition: attachment; filename="devices.json"
-- **Material Design**: Moderne UI/UX mit Animationen und Transitions
-```http
-POST /api/import-devices
-Content-Type: application/json
-Body: {JSON backup data}
 
-Response:
-{
-  "status": "success",
-  "message": "Geräte erfolgreich importiert"
-}
-```
 
-## 🏠 Loxone Home Automation Integration
-GET /loxone/device?address={MAC}
-Content-Type: text/plain
-Response: "present" | "absent" | "unknown"
-- **Structured Data Format**: Versionierte JSON-Schemas mit Metadaten
-### Ideen & mögliche Erweiterungen
-- **Backup-Validation**: JSON-Schema-Validierung vor Import
-Mögliche Ideen:
-  - MQTT / Home Assistant Integration
-  - Mobile App / Push Notifications
-  - WebSockets für echte Echtzeit-Updates
-  - Erweiterte Analytics
-GPIO: 22 digital I/O pins (GPIO 0-21)
-ADC: 6x 12-bit ADC channels
-## 📊 Projekt-Status
-
-**Aktueller Stand (funktional, laufend weiterentwickelt)**
-
-### ✅ Core Features
-USB: USB-C mit automatischem Download-Modus
-### ✅ Performance & Reliability
-
-### ✅ Documentation & Support
-Flash: 4MB (~1.506.000 bytes verwendet ≈ 47.9%)
-**Updates**: 3s HTTP-Polling Intervall
-#define RELAY_OUTPUT_PIN    4   // Relais-Ausgang (3.3V Logic)
-#define WIFI_RESET_BUTTON   0   // Boot-Button (Hardware-Reset)
-```
 
 ### Relais-Modul Kompatibilität
 - **3.3V Logic-Level**: Direkt ESP32-C3 kompatibel
@@ -117,12 +66,16 @@ graph TD
 **Schritt-für-Schritt:**
 1. **Firmware flashen**: `platformio run --target upload`
 2. **WLAN öffnen**: ESP32 startet als `ESP32-BT-Scanner` (OHNE Passwort)
-3. **Verbindung**: Smartphone/Laptop verbindet sich automatisch
-4. **Portal**: Browser öffnet Captive Portal automatisch (oder `http://192.168.4.1`)
+3. **Verbindung**: Smartphone/Laptop zum Access Point verbinden
+4. **Portal öffnet automatisch**: 
+   - **Automatisch**: Bei den meisten Geräten öffnet sich das Setup-Portal automatisch
+   - **Manuell**: Falls nicht, Browser öffnen und `http://192.168.4.1` eingeben
 5. **Konfiguration**: WLAN auswählen, Passwort eingeben, "Save"
 6. **Fertig**: ESP32 startet neu, Web-Interface unter neuer IP verfügbar
 
-**WiFi-Reset**: Boot-Button 3 Sekunden drücken → Neukonfiguration
+**💡 Tipp**: Wenn das Captive Portal nicht automatisch öffnet, einfach im Browser `192.168.4.1` aufrufen.
+
+**WiFi-Reset**: Boot-Button (GPIO9) 3 Sekunden drücken → Neukonfiguration
 
 ### 2. Kompilierung & Upload
 
@@ -137,7 +90,7 @@ platformio run
 # Upload auf ESP32-C3 (automatischer Port-Detection)
 platformio run --target upload
 
-# Serielle Konsole für Debug (optional)
+# Serielle Konsole: Standard-Logs sind deaktiviert (Speicher-Optimierung)
 platformio device monitor --baud 115200
 ```
 
@@ -152,7 +105,7 @@ graph LR
     E --> F[System läuft produktiv]
 ```
 
-1. **Web-Interface**: `http://[ESP32_IP]` öffnen (IP im Captive Portal angezeigt)
+1. **Web-Interface**: `http://[ESP32_IP]` öffnen (solange kein WLAN verbunden ist erscheint automatisch die Setup-Seite, danach die Hauptseite)
 2. **Geräte-Scan**: Läuft automatisch, BLE-Geräte erscheinen in Liste
 3. **Bekannte Geräte**: Gewünschte Geräte als "bekannt" markieren
 4. **RSSI-Tuning**: Schwellenwerte pro Gerät einstellen (-60 bis -90 dBm)
@@ -164,7 +117,7 @@ graph LR
 ### Dashboard-Übersicht
 ```
 ┌─ Status-Bar ─────────────────────────────────────────┐
-│ WiFi: ✅ Connected │ Geräte: 5/8 │ Output: 🟢 AN     │
+│ WiFi: ✅ Connected │ Geräte: 5/32 │ Output: 🟢 AN     │
 │ Uptime: 2d 14h 32m │ Scan: ✅ Active │ RAM: 21.5%    │
 └──────────────────────────────────────────────────────┘
 
@@ -186,7 +139,7 @@ graph LR
 - **Filter & Sortierung**: Nach Name, RSSI, Hersteller, Status
 - **Export/Import**: JSON-basierte Backup-/Restore-Funktionen
 - **System-Management**: WiFi/Bluetooth/System Reset-Buttons
-- **Real-time Updates**: Automatische Aktualisierung alle 3s
+- **Aktualisierung**: On-Demand via Button oder Seitenreload
 
 ## 🔗 REST-API Dokumentation
 
@@ -208,7 +161,9 @@ Response:
       "active": true,
       "lastSeenRelative": "vor 5s",
       "manufacturer": "Apple Inc.",
-      "deviceType": "iPhone",
+      "payloadHex": "0201061AFF...",
+      "comment": "Mein iPhone",
+      "rssiThreshold": -70,
       "proximityStatus": "green"
     }
   ],
@@ -225,7 +180,7 @@ Response:
 ```
 
 ```http
-POST /api/device/known?address={MAC}&known={true/false}&comment={text}&rssiThreshold={-60..-90}
+POST /api/device/known?address={MAC}&known={true|false}&comment={TEXT}&rssiThreshold={-60..-90}
 Content-Type: application/json
 
 Response:
@@ -238,30 +193,25 @@ Response:
 ### 📊 System Status API
 
 ```http
-GET  /api/status
-Content-Type: application/json
-
+GET /api/status
 Response:
 {
-  "status": "success",
-  "wifi": {
-    "connected": true,
-    "ssid": "HomeNetwork",
-    "ip": "192.168.1.100",
-    "rssi": -45
-  },
-  "system": {
-    "uptime": 123456789,
-    "freeHeap": 234567,
-    "scanActive": true,
-    "outputState": true
-  },
-  "devices": {
-    "total": 5,
-    "known": 3,
-    "active": 4,
-    "present": 2
-  }
+  "uptime": "2h 15m",
+  "devices_ever": 42,
+  "devices": 5,
+  "known": 3,
+  "present": 2,
+  "wifi_connected": true,
+  "wifi_ssid": "HomeNetwork",
+  "wifi_rssi": -45,
+  "wifi_ip": "192.168.1.100",
+  "wifi_gateway": "192.168.1.1",
+  "wifi_subnet": "255.255.255.0",
+  "wifi_dns": "192.168.1.1",
+  "wifi_mode": "Station",
+  "heap_free": 228456,
+  "scanning": true,
+  "outputActive": true
 }
 ```
 
@@ -508,15 +458,15 @@ Sicherung: Automaten-Sicherung B2A für 24V-Kreis
 ```yaml
 RAM-Nutzung:
   Gesamt: 320KB
-  Verwendet: 68.812 bytes (21.5%)
-  Verfügbar: 251.188 bytes (78.5%)
+  Verwendet: 89.236 bytes (27.2%)
+  Verfügbar: 238.444 bytes (72.8%)
   Stack: ~8KB (reserviert)
   Heap: ~260KB (dynamisch)
 
 Flash-Nutzung:
   Gesamt: 4MB
-  Firmware: 1.499.494 bytes (47.7%)
-  Verfügbar: 2.500.506 bytes (52.3%)
+  Firmware: 1.495.176 bytes (47.5%)
+  Verfügbar: 1.650.552 bytes (52.5%)
   OTA-Reserve: ~1.5MB (für Updates)
   Filesystem: ~500KB (für zukünftige Features)
 
@@ -541,12 +491,13 @@ Recovery-Time: ~3s (nach Watchdog-Reset)
 ### Speicher-Management
 ```cpp
 // Device Arrays (statisch alloziert)
-SafeDevice devices[MAX_DEVICES];              // 8 * 280 bytes = 2.2KB
-char knownMACs[MAX_KNOWN][18];               // 3 * 18 bytes = 54 bytes
-char knownComments[MAX_KNOWN][50];           // 3 * 50 bytes = 150 bytes
+SafeDevice devices[MAX_DEVICES];              // 32 * 280 bytes = 8.9KB
+char knownMACs[MAX_KNOWN][18];               // 200 * 18 bytes = 3.6KB
+char knownComments[MAX_KNOWN][MAX_COMMENT_LENGTH]; // 200 * 32 bytes = 6.4KB
+int knownRSSIThresholds[MAX_KNOWN];          // 200 * 4 bytes = 0.8KB
 OutputLogEntry outputLog[MAX_OUTPUT_LOG_ENTRIES]; // 30 * 120 bytes = 3.6KB
 
-// Total Static Memory: ~6KB
+// Total Static Memory: ~23KB
 // Dynamic Memory (JSON, Buffers): ~15KB
 // Network Buffers: ~20KB
 // Bluetooth Stack: ~25KB
@@ -564,15 +515,14 @@ OutputLogEntry outputLog[MAX_OUTPUT_LOG_ENTRIES]; // 30 * 120 bytes = 3.6KB
 5. 2.4GHz Band aktiviert? (nicht 5GHz)
 
 # Symptom: WLAN-Verbindung instabil
-1. Boot-Button 3s drücken → WiFi-Reset
+1. Boot-Button (GPIO9) 3s drücken → WiFi-Reset
 2. Captive Portal erneut durchlaufen
 3. Router-Firmware aktualisieren
 4. Kanal-Interferenzen prüfen (Kanal 1, 6, 11 bevorzugt)
 
 # Debug via Serial Monitor
 platformio device monitor --baud 115200
-# Erwartete Ausgabe:
-# "WiFi: Verbunden! IP: 192.168.x.x"
+# Hinweis: Standard-Code erzeugt keine Serial-Ausgaben; Diagnose über /api/status und /health
 ```
 
 ### Bluetooth-Probleme
@@ -590,9 +540,7 @@ platformio device monitor --baud 115200
 4. Device-Timeout: 2min ohne Signal = "weg"
 
 # BLE-Debug via Serial Monitor
-# Erwartete Ausgabe:
-# "BLE: Found device aa:bb:cc:dd:ee:ff, RSSI: -65"
-# "BLE: Known device detected, output ON"
+# Hinweis: BLE-Ereignisse erscheinen nicht seriell; Statuswechsel über Output-Log /api/output-log
 ```
 
 ### Web-Interface-Probleme
@@ -619,9 +567,9 @@ platformio device monitor --baud 115200
 ```bash
 # LED-Status interpretieren
 Dauerhaft AUS:   Kein bekanntes Gerät in Reichweite
-Dauerhaft AN:    Bekannte Geräte anwesend
+Dauerhaft AN:    Mindestens ein bekanntes Gerät nah genug (Threshold erfüllt)
 Blinkt schnell:  WiFi-Verbindungsaufbau
-Blinkt 3x:       WiFi-Reset aktiviert
+Blinkt 3x:       WiFi-Reset erkannt
 
 # GPIO-Testing via API
 curl -X POST http://IP/api/output-log/test
@@ -649,77 +597,6 @@ curl http://IP/api/status | jq '.system.uptime'
 # Problem: Keine Updates >30s = BLE-Fehler
 ```
 
-## 🔮 Roadmap & Geplante Features
-
-### Version 2.0 - MQTT & Home Assistant Integration
-```yaml
-Zieltermin: Q1 2025
-Features:
-  - MQTT Broker Support (TLS/SSL)
-  - Home Assistant Auto-Discovery
-  - Device Classes für HA (presence, motion, battery)
-  - Retained Messages für Status-Persistence
-  - JSON-basierte MQTT Payloads
-  
-Technische Details:
-  - PubSubClient Library Integration
-  - Async MQTT für Non-blocking Operations
-  - Configuration via Web-Interface
-  - Certificate Management für TLS
-```
-
-### Version 2.1 - Mobile App & Push Notifications
-```yaml
-Zieltermin: Q2 2025
-Features:
-  - Native iOS/Android App (Flutter)
-  - Push Notifications via Firebase
-  - QR-Code Setup für Quick-Pairing
-  - Offline-Mode mit lokaler Datenspeicherung
-  - Bluetooth-Mesh für Multi-Device Setups
-
-Technische Details:
-  - REST API Extension für Mobile
-  - WebSocket Real-time Updates
-  - OAuth2 Authentication
-  - End-to-End Encryption
-```
-
-### Version 2.2 - Machine Learning & Advanced Analytics
-```yaml
-Zieltermin: Q3 2025
-Features:
-  - TensorFlow Lite Micro Integration
-  - Predictive Presence Detection
-  - Anomaly Detection für unbekannte Geräte
-  - Time-based Learning Patterns
-  - Energy Optimization via ML
-
-Technische Details:
-  - On-device Training mit Edge AI
-  - RSSI Pattern Recognition
-  - Behavioral Analysis Engine
-  - Cloud-sync für Model Updates
-```
-
-### Version 3.0 - Multi-Zone & Enterprise Features
-```yaml
-Zieltermin: Q4 2025
-Features:
-  - Multi-Zone Support (bis 10 ESP32 Nodes)
-  - Central Management Dashboard
-  - Role-based Access Control (RBAC)
-  - Advanced Logging & Analytics
-  - Professional API Documentation
-  
-Technische Details:
-  - ESP-NOW Mesh Networking
-  - Centralized Configuration Management
-  - Time-series Database Integration
-  - Professional UI/UX Redesign
-  - Docker Container Support
-```
-
 ## 📄 Lizenz & Support
 
 ### MIT License
@@ -745,7 +622,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/jandressler/esp32-bt-scanner/issues)
 - 💡 **Feature Requests**: [GitHub Discussions](https://github.com/jandressler/esp32-bt-scanner/discussions)
 - 📖 **Documentation**: [Wiki](https://github.com/jandressler/esp32-bt-scanner/wiki)
-- �� **Community Support**: [Discord Server](https://discord.gg/esp32-bt-scanner)
+- 💬 **Community Support**: (Discord Link Placeholder)
 - 🎯 **Professional Support**: [kontakt@jandressler.de](mailto:kontakt@jandressler.de)
 
 ### Contributing Guidelines
@@ -757,45 +634,3 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 5. Update documentation (README, Wiki, Code comments)
 6. Submit Pull Request with detailed description
 ```
-
-## 📊 Projekt-Status
-
-**🎉 PROJEKT ABGESCHLOSSEN - ENTERPRISE PRODUKTIONSREIF**
-
-### ✅ Core Features (100% Complete)
-- **Bluetooth Low Energy Scanner**: Kontinuierliches Scanning mit Payload-Analyse
-- **WiFiManager Captive Portal**: Zero-Config Setup ohne Hardcoding
-- **Hardware Watchdog**: 30s Timeout mit automatischer Recovery
-- **GPIO Hardware-Integration**: Relais + LED synchron geschaltet
-- **Output-Log-System**: 30-Entry Ringbuffer mit vollständiger Nachverfolgung
-- **Loxone HTTP-API**: Text/Plain Endpunkte für Miniserver-Integration
-- **Export/Import Backup**: JSON-basierte Geräte-Datensicherung
-- **Professional Web-Interface**: Responsive Design mit Real-time Updates
-
-### ✅ Performance & Reliability (100% Complete)
-- **Memory Optimization**: 21.5% RAM, 47.7% Flash usage
-- **24/7 Stability**: Hardware Watchdog + automatic recovery
-- **Enterprise Security**: WPA2/WPA3 Support, keine Hardcoded Credentials
-- **Industrial Integration**: 3.3V → 24V Optokoppler-compatible
-- **Real-time Monitoring**: 3s Update-Intervall mit WebSocket-like Performance
-
-### ✅ Documentation & Support (100% Complete)
-- **Complete Technical Documentation**: API, Hardware, Troubleshooting
-- **Professional README**: Enterprise-grade with performance metrics
-- **Code Documentation**: Doxygen-compatible inline documentation
-- **Setup Guides**: Step-by-step für alle Deployment-Szenarien
-- **Troubleshooting Guide**: Comprehensive problem resolution
-
-### 🚀 Deployment Ready For:
-- ✅ **Home Automation**: Loxone, Home Assistant, FHEM
-- ✅ **Commercial Buildings**: Büros, Praxen, kleine Unternehmen  
-- ✅ **Industrial IoT**: 24V-Integration, SPS-kompatibel
-- ✅ **Development Platform**: Erweiterbar für Custom-Anwendungen
-- ✅ **Educational Use**: Hochschulen, Berufsschulen, Maker-Spaces
-
----
-
-**Entwickelt mit ❤️ für professionelle Home Automation & Industrial IoT**  
-**ESP32-C3 RISC-V • 24/7 Reliability • Enterprise-Grade Security**
-
-🏠⚡🔧 **Ready for Production Deployment** 🔧⚡🏠

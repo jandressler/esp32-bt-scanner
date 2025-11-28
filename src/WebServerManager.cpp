@@ -67,7 +67,14 @@ void WebServerManager::setupMainServerRoutes() {
     if (!server) return;
     
     server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
-        request->send(200, "text/html", WebUI::generateMainHTML());
+        // Dynamisch je nach aktuellem Sicherheitsstatus Setup- oder Hauptseite liefern
+        if (isSetupRequired()) {
+            String setup = WebUI::generateSetupHTML();
+            request->send(200, "text/html", setup);
+            return;
+        }
+        String page = WebUI::generateMainHTML();
+        request->send(200, "text/html", page);
     });
     
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -99,6 +106,16 @@ void WebServerManager::setupMainServerRoutes() {
     
     server->on("/api/system/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
         handleSystemReset(request);
+    });
+
+    // Health check endpoint
+    server->on("/health", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send(200, "text/plain", "ok");
+    });
+
+    // Redirect unknown paths to root to avoid blank pages
+    server->onNotFound([](AsyncWebServerRequest *request){
+        request->redirect("/");
     });
     
     server->on("/api/bluetooth/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
@@ -557,6 +574,10 @@ void WebServerManager::handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *
         
         if (success) {
             sendJSONResponse(request, "success", "WiFi verbunden! IP: " + wifiManager.getLocalIP());
+            // Nach erfolgreicher Verbindung Haupt-Routen aktivieren
+            this->end();
+            this->setSecureMode(true);
+            this->begin(deviceManager, bluetoothScanner);
         } else {
             sendJSONResponse(request, "error", "WiFi Verbindung fehlgeschlagen");
         }

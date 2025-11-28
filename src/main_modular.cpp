@@ -38,8 +38,7 @@ void updateLEDStatus();
 
 void setup() {
     // Initialize serial for debugging
-    Serial.begin(115200);
-    Serial.println("ESP32-C3 BT Scanner starting...");
+    
     
     // Hardware Watchdog initialize (must be first!)
     initializeWatchdog();
@@ -57,28 +56,28 @@ void setup() {
     memset(devices, 0, sizeof(devices));
     
     // Initialize modules
-    Serial.println("Initializing DeviceManager...");
+    
     deviceManager.begin(devices, MAX_DEVICES);
     
-    Serial.println("Initializing WiFiManager...");
+    
     if (!wifiManager.begin()) {
-        Serial.println("WiFi initialization failed!");
+        
     }
     
-    Serial.println("Initializing WebServerManager...");
+    
     webServerManager.setSecureMode(wifiManager.isSecure());
     if (!webServerManager.begin(&deviceManager, &bluetoothScanner)) {
-        Serial.println("WebServer initialization failed!");
+        
     }
     
     // Initialize Bluetooth only in secure mode
     if (wifiManager.isSecure()) {
-        Serial.println("Initializing BluetoothScanner...");
+        
         if (!bluetoothScanner.begin(&deviceManager)) {
-            Serial.println("Bluetooth initialization failed!");
+            
         }
     } else {
-        Serial.println("Bluetooth disabled - unsecure mode");
+        
     }
     
     systemInitialized = true;
@@ -86,14 +85,13 @@ void setup() {
     setPresenceOutput(false);
     knownDevicesPresent = false;
     
-    Serial.println("System initialization complete!");
-    Serial.print("WiFi Status: ");
+    
     if (wifiManager.isConnected()) {
-        Serial.println("Connected to " + wifiManager.getSSID() + " (" + wifiManager.getLocalIP() + ")");
+        
     } else if (wifiManager.isInAPMode()) {
-        Serial.println("Access Point mode (" + wifiManager.getAPIP() + ")");
+        
     } else {
-        Serial.println("Not connected");
+        
     }
 }
 
@@ -104,16 +102,17 @@ void loop() {
     // Debug output every 30 seconds
     if (now - lastDebugPrint > 30000) {
         lastDebugPrint = now;
-        Serial.println("System running... Uptime: " + String((now - startTime) / 1000) + "s");
+        
         if (bluetoothScanner.isInitialized()) {
-            Serial.println("Devices: " + String(deviceManager.getDeviceCount()) + 
-                          ", Known: " + String(deviceManager.getKnownCount()) +
-                          ", Failed scans: " + String(bluetoothScanner.getFailedScansCount()));
+            
         }
     }
     
     // Feed watchdog (prevents automatic restart)
     feedWatchdog();
+    
+    // WiFi manager loop (DNS processing for captive portal)
+    wifiManager.loop();
     
     // WiFi reset button monitoring
     wifiManager.checkResetButton();
@@ -131,7 +130,7 @@ void initializeWatchdog() {
     if (WATCHDOG_ENABLED) {
         esp_task_wdt_init(WATCHDOG_TIMEOUT_SEC, true);
         esp_task_wdt_add(NULL);
-        Serial.println("Watchdog initialized (" + String(WATCHDOG_TIMEOUT_SEC) + "s timeout)");
+        
     }
 }
 

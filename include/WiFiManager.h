@@ -12,6 +12,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include <DNSServer.h>
 #include "Config.h"
 
 /**
@@ -26,6 +27,9 @@ private:
     bool isInSecureMode;
     unsigned long buttonPressStart;
     bool buttonPressed;
+    
+    // DNS Server für Captive Portal
+    DNSServer* dnsServer;
     
     // Statische IP Konfiguration
     bool useStaticIP;
@@ -72,6 +76,9 @@ public:
     // Reset functionality
     void checkResetButton();
     void performReset();
+    
+    // Loop processing
+    void loop();
     
     // Getters
     String getSSID() const { return savedSSID; }
