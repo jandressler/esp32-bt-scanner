@@ -109,9 +109,6 @@ private:
     // Hilfs-Methoden
     String formatRelativeTime(unsigned long seconds);
     void updateAllDeviceStatus();
-    String generateSetupHTML();
-    String generateMainHTML();
-    String generateMainHTMLScript();
     void sendJSONResponse(AsyncWebServerRequest *request, const String& status, const String& message = "");
 };
 
