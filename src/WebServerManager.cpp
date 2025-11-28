@@ -101,6 +101,103 @@ void WebServerManager::setupMainServerRoutes() {
     }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
         handleImportDevicesFile(request, data, len, index, total);
     });
+
+    // Loxone API Endpunkte
+    server->on("/loxone/presence", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Text: "present" oder "absent"
+        bool present = false;
+        SafeDevice* devices = deviceManager->getDevices();
+        int knownCount = deviceManager->getKnownCount();
+        int* thresholds = deviceManager->getKnownRSSIThresholds();
+        char (*macs)[18] = deviceManager->getKnownMACs();
+        for (int i = 0; i < knownCount; i++) {
+            for (int j = 0; j < deviceManager->getDeviceCount(); j++) {
+                if (strcmp(devices[j].address, macs[i]) == 0 && devices[j].isActive && devices[j].rssi >= thresholds[i]) {
+                    present = true;
+                    break;
+                }
+            }
+            if (present) break;
+        }
+        request->send(200, "text/plain", present ? "present" : "absent");
+    });
+
+    server->on("/loxone/presence_num", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Numeric: 1 = present, 0 = absent
+        bool present = false;
+        SafeDevice* devices = deviceManager->getDevices();
+        int knownCount = deviceManager->getKnownCount();
+        int* thresholds = deviceManager->getKnownRSSIThresholds();
+        char (*macs)[18] = deviceManager->getKnownMACs();
+        for (int i = 0; i < knownCount; i++) {
+            for (int j = 0; j < deviceManager->getDeviceCount(); j++) {
+                if (strcmp(devices[j].address, macs[i]) == 0 && devices[j].isActive && devices[j].rssi >= thresholds[i]) {
+                    present = true;
+                    break;
+                }
+            }
+            if (present) break;
+        }
+        request->send(200, "text/plain", present ? "1" : "0");
+    });
+
+    server->on("/loxone/status", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Text: "online" oder "error"
+        bool ok = wifiManager.isConnected();
+        request->send(200, "text/plain", ok ? "online" : "error");
+    });
+
+    server->on("/loxone/status_num", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Numeric: 1 = online, 0 = error
+        bool ok = wifiManager.isConnected();
+        request->send(200, "text/plain", ok ? "1" : "0");
+    });
+
+    server->on("/loxone/device", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Text: "present", "absent", "unknown"
+        if (!request->hasParam("address")) {
+            request->send(400, "text/plain", "unknown");
+            return;
+        }
+        String address = request->getParam("address")->value();
+        SafeDevice* devices = deviceManager->getDevices();
+        int found = -1;
+        for (int i = 0; i < deviceManager->getDeviceCount(); i++) {
+            if (address.equalsIgnoreCase(devices[i].address)) {
+                found = i;
+                break;
+            }
+        }
+        if (found == -1) {
+            request->send(200, "text/plain", "unknown");
+            return;
+        }
+        bool present = devices[found].isActive && devices[found].isKnown && devices[found].rssi >= devices[found].rssiThreshold;
+        request->send(200, "text/plain", present ? "present" : "absent");
+    });
+
+    server->on("/loxone/device_num", HTTP_GET, [this](AsyncWebServerRequest *request){
+        // Numeric: 1 = present, 0 = absent, -1 = unknown
+        if (!request->hasParam("address")) {
+            request->send(400, "text/plain", "-1");
+            return;
+        }
+        String address = request->getParam("address")->value();
+        SafeDevice* devices = deviceManager->getDevices();
+        int found = -1;
+        for (int i = 0; i < deviceManager->getDeviceCount(); i++) {
+            if (address.equalsIgnoreCase(devices[i].address)) {
+                found = i;
+                break;
+            }
+        }
+        if (found == -1) {
+            request->send(200, "text/plain", "-1");
+            return;
+        }
+        bool present = devices[found].isActive && devices[found].isKnown && devices[found].rssi >= devices[found].rssiThreshold;
+        request->send(200, "text/plain", present ? "1" : "0");
+    });
 }
 
 void WebServerManager::handleScanNetworks(AsyncWebServerRequest *request) {
