@@ -27,6 +27,13 @@ private:
     unsigned long buttonPressStart;
     bool buttonPressed;
     
+    // Statische IP Konfiguration
+    bool useStaticIP;
+    IPAddress staticIP;
+    IPAddress gateway;
+    IPAddress subnet;
+    IPAddress dns;
+    
 public:
     WiFiManager();
     ~WiFiManager();
@@ -46,8 +53,14 @@ public:
     
     // Setup Methods
     bool connectToWiFi(const String& ssid, const String& password);
+    bool connectToWiFi(const String& ssid, const String& password, const String& ip, const String& gateway, const String& subnet, const String& dns);
     bool setAPPassword(const String& password);
     void resetWiFiSettings();
+    
+    // Static IP Management
+    bool saveStaticIPConfig(const String& ip, const String& gateway, const String& subnet, const String& dns);
+    void clearStaticIPConfig();
+    bool isUsingStaticIP() const { return useStaticIP; }
     
     // Status
     bool isConnected() const;

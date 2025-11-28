@@ -6,7 +6,7 @@
 #include "WiFiManager.h"
 
 WiFiManager::WiFiManager() 
-    : isInSecureMode(false), buttonPressStart(0), buttonPressed(false) {
+    : isInSecureMode(false), buttonPressStart(0), buttonPressed(false), useStaticIP(false) {
 }
 
 WiFiManager::~WiFiManager() {
@@ -36,6 +36,15 @@ bool WiFiManager::connectToWiFi() {
     if (savedSSID.length() == 0) return false;
     
     WiFi.mode(WIFI_STA);
+    
+    // Konfiguriere statische IP falls aktiviert
+    if (useStaticIP) {
+        if (!WiFi.config(staticIP, gateway, subnet, dns)) {
+            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+            useStaticIP = false;
+        }
+    }
+    
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
     
     // Wait up to 20 seconds for connection
@@ -168,6 +177,24 @@ void WiFiManager::loadSettings() {
     savedPassword = preferences.getString("password", "");
     savedAPPassword = preferences.getString("ap_password", "");
     
+    // Statische IP laden
+    useStaticIP = preferences.getBool("use_static_ip", false);
+    if (useStaticIP) {
+        String ipStr = preferences.getString("static_ip", "");
+        String gwStr = preferences.getString("gateway", "");
+        String snStr = preferences.getString("subnet", "255.255.255.0");
+        String dnsStr = preferences.getString("dns", "8.8.8.8");
+        
+        if (ipStr.length() > 0) {
+            staticIP.fromString(ipStr);
+            gateway.fromString(gwStr);
+            subnet.fromString(snStr);
+            dns.fromString(dnsStr);
+        } else {
+            useStaticIP = false;
+        }
+    }
+    
     preferences.end();
 }
 
@@ -185,6 +212,68 @@ bool WiFiManager::connectToWiFi(const String& ssid, const String& password) {
     
     // Versuche Verbindung
     WiFi.mode(WIFI_STA);
+    
+    // Konfiguriere statische IP falls aktiviert
+    if (useStaticIP) {
+        if (!WiFi.config(staticIP, gateway, subnet, dns)) {
+            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+        }
+    }
+    
+    WiFi.begin(ssid.c_str(), password.c_str());
+    
+    Serial.println("WiFi: Verbinde mit " + ssid + "...");
+    
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < WIFI_TIMEOUT_MS) {
+        delay(100);
+        Serial.print(".");
+    }
+    Serial.println();
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("WiFi: Verbunden! IP: " + WiFi.localIP().toString());
+        isInSecureMode = true;
+        return true;
+    } else {
+        Serial.println("WiFi: Verbindung fehlgeschlagen");
+        // Fallback zum AP-Modus
+        startAccessPoint("");
+        return false;
+    }
+}
+
+bool WiFiManager::connectToWiFi(const String& ssid, const String& password, const String& ip, const String& gateway, const String& subnet, const String& dns) {
+    if (ssid.length() == 0) {
+        Serial.println("WiFi: Leere SSID");
+        return false;
+    }
+    
+    // Speichere Credentials
+    if (!saveWiFiCredentials(ssid, password)) {
+        Serial.println("WiFi: Fehler beim Speichern der Credentials");
+        return false;
+    }
+    
+    // Speichere statische IP Config
+    if (ip.length() > 0 && gateway.length() > 0) {
+        if (!saveStaticIPConfig(ip, gateway, subnet, dns)) {
+            Serial.println("WiFi: Fehler beim Speichern der statischen IP");
+        }
+    }
+    
+    // Versuche Verbindung
+    WiFi.mode(WIFI_STA);
+    
+    // Konfiguriere statische IP
+    if (useStaticIP) {
+        if (!WiFi.config(staticIP, this->gateway, this->subnet, this->dns)) {
+            Serial.println("WiFi: Statische IP Konfiguration fehlgeschlagen");
+        } else {
+            Serial.println("WiFi: Statische IP konfiguriert - " + staticIP.toString());
+        }
+    }
+    
     WiFi.begin(ssid.c_str(), password.c_str());
     
     Serial.println("WiFi: Verbinde mit " + ssid + "...");
@@ -250,4 +339,41 @@ void WiFiManager::updateSecurityStatus() {
     
     Serial.print("WiFi: Sicherheitsstatus aktualisiert - ");
     Serial.println(isInSecureMode ? "SICHER" : "UNSICHER");
+}
+
+bool WiFiManager::saveStaticIPConfig(const String& ip, const String& gateway, const String& subnet, const String& dns) {
+    preferences.begin("wifi", false);
+    
+    preferences.putBool("use_static_ip", true);
+    preferences.putString("static_ip", ip);
+    preferences.putString("gateway", gateway);
+    preferences.putString("subnet", subnet.length() > 0 ? subnet : "255.255.255.0");
+    preferences.putString("dns", dns.length() > 0 ? dns : "8.8.8.8");
+    
+    preferences.end();
+    
+    useStaticIP = true;
+    staticIP.fromString(ip);
+    this->gateway.fromString(gateway);
+    this->subnet.fromString(subnet.length() > 0 ? subnet : "255.255.255.0");
+    this->dns.fromString(dns.length() > 0 ? dns : "8.8.8.8");
+    
+    Serial.println("WiFi: Statische IP gespeichert - " + ip);
+    return true;
+}
+
+void WiFiManager::clearStaticIPConfig() {
+    preferences.begin("wifi", false);
+    
+    preferences.putBool("use_static_ip", false);
+    preferences.remove("static_ip");
+    preferences.remove("gateway");
+    preferences.remove("subnet");
+    preferences.remove("dns");
+    
+    preferences.end();
+    
+    useStaticIP = false;
+    
+    Serial.println("WiFi: Statische IP Konfiguration gelöscht");
 }

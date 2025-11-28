@@ -50,12 +50,16 @@ void WebServerManager::setupSetupRoutes() {
     server->on("/api/scan", HTTP_GET, [this](AsyncWebServerRequest *request){
         handleScanNetworks(request);
     });
-    // Minimal stubs for setup actions used by the Setup UI
+    // Setup-spezifische Handler mit Body-Parsing
     server->on("/setup/wifi", HTTP_POST, [this](AsyncWebServerRequest *request){
         sendJSONResponse(request, "success", "WLAN wird verbunden...");
+    }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        handleSetupWiFi(request, data, len, index, total);
     });
     server->on("/setup/ap", HTTP_POST, [this](AsyncWebServerRequest *request){
         sendJSONResponse(request, "success", "AP wird eingerichtet...");
+    }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        handleSetupAP(request, data, len, index, total);
     });
 }
 
@@ -72,6 +76,16 @@ void WebServerManager::setupMainServerRoutes() {
     
     server->on("/api/devices", HTTP_GET, [this](AsyncWebServerRequest *request){
         handleDevicesAPI(request);
+    });
+    
+    server->on("/api/output-log", HTTP_GET, [this](AsyncWebServerRequest *request){
+        String logJson = deviceManager->getOutputLogJson();
+        request->send(200, "application/json", logJson);
+    });
+    
+    server->on("/api/output-log/clear", HTTP_POST, [this](AsyncWebServerRequest *request){
+        deviceManager->clearOutputLog();
+        sendJSONResponse(request, "success", "Output-Log gelöscht");
     });
     
     server->on("/api/wifi/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
@@ -474,6 +488,98 @@ void WebServerManager::sendJSONResponse(AsyncWebServerRequest *request, const St
     String response;
     serializeJson(doc, response);
     request->send(status == "success" ? 200 : 400, "application/json", response);
+}
+
+void WebServerManager::handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    static String bodyBuffer = "";
+    
+    // Sammle alle Body-Daten
+    if (index == 0) {
+        bodyBuffer = "";
+    }
+    
+    for (size_t i = 0; i < len; i++) {
+        bodyBuffer += (char)data[i];
+    }
+    
+    // Verarbeite nur wenn alle Daten empfangen wurden
+    if (index + len == total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, bodyBuffer);
+        
+        if (error) {
+            sendJSONResponse(request, "error", "Ungültige JSON-Daten");
+            return;
+        }
+        
+        String ssid = doc["ssid"] | "";
+        String password = doc["password"] | "";
+        
+        if (ssid.length() == 0) {
+            sendJSONResponse(request, "error", "SSID fehlt");
+            return;
+        }
+        
+        bool success = false;
+        
+        // Prüfe ob statische IP konfiguriert werden soll
+        if (doc.containsKey("static_ip") && doc["static_ip"].as<String>().length() > 0) {
+            String ip = doc["static_ip"] | "";
+            String gateway = doc["gateway"] | "";
+            String subnet = doc["subnet"] | "255.255.255.0";
+            String dns = doc["dns"] | "8.8.8.8";
+            
+            success = wifiManager.connectToWiFi(ssid, password, ip, gateway, subnet, dns);
+        } else {
+            // Normale Verbindung ohne statische IP
+            success = wifiManager.connectToWiFi(ssid, password);
+        }
+        
+        if (success) {
+            sendJSONResponse(request, "success", "WiFi verbunden! IP: " + wifiManager.getLocalIP());
+        } else {
+            sendJSONResponse(request, "error", "WiFi Verbindung fehlgeschlagen");
+        }
+    }
+}
+
+void WebServerManager::handleSetupAP(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    static String bodyBuffer = "";
+    
+    // Sammle alle Body-Daten
+    if (index == 0) {
+        bodyBuffer = "";
+    }
+    
+    for (size_t i = 0; i < len; i++) {
+        bodyBuffer += (char)data[i];
+    }
+    
+    // Verarbeite nur wenn alle Daten empfangen wurden
+    if (index + len == total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, bodyBuffer);
+        
+        if (error) {
+            sendJSONResponse(request, "error", "Ungültige JSON-Daten");
+            return;
+        }
+        
+        String password = doc["password"] | "";
+        
+        if (password.length() < 8) {
+            sendJSONResponse(request, "error", "Passwort muss mindestens 8 Zeichen haben");
+            return;
+        }
+        
+        if (wifiManager.setAPPassword(password)) {
+            sendJSONResponse(request, "success", "AP-Passwort gesetzt, System startet neu...");
+            delay(500);
+            ESP.restart();
+        } else {
+            sendJSONResponse(request, "error", "Fehler beim Setzen des AP-Passworts");
+        }
+    }
 }
 
 void WebServerManager::setupAPIRoutes() {
