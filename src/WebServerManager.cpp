@@ -253,10 +253,13 @@ void WebServerManager::handleStatusAPI(AsyncWebServerRequest *request) {
     JsonDocument doc;
     unsigned long uptimeSeconds = millis() / 1000;
     doc["uptime"] = formatRelativeTime(uptimeSeconds);
-    doc["devices"] = deviceManager->getDeviceCount();
-    doc["known"] = deviceManager->getKnownCount();
+    doc["devices_ever"] = deviceManager->getTotalEverSeen();  // Geräte total ever
+    doc["devices"] = deviceManager->getActiveCount();  // Aktiv (current seen)
+    doc["known"] = deviceManager->getKnownCount();  // Bekannt (saved)
+    doc["present"] = deviceManager->getPresentCount();  // Anwesend (seen+near)
     doc["wifi_connected"] = wifiManager.isConnected();
     doc["wifi_ssid"] = wifiManager.getSSID();
+    doc["wifi_mode"] = wifiManager.isConnected() ? "Station" : (wifiManager.isInAPMode() ? "Access Point" : "---");
     doc["heap_free"] = ESP.getFreeHeap();
     
     // Neue Status-Informationen hinzufügen

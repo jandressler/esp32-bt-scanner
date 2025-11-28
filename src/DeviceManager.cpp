@@ -5,11 +5,12 @@
 
 #include "DeviceManager.h"
 
-DeviceManager::DeviceManager() : devices(nullptr), deviceCount(0), knownCount(0), outputLogCount(0), outputLogIndex(0) {
+DeviceManager::DeviceManager() : devices(nullptr), deviceCount(0), knownCount(0), outputLogCount(0), outputLogIndex(0), totalEverSeen(0) {
     memset(knownMACs, 0, sizeof(knownMACs));
     memset(knownComments, 0, sizeof(knownComments));
     memset(knownRSSIThresholds, DEFAULT_RSSI_THRESHOLD, sizeof(knownRSSIThresholds));
     memset(outputLog, 0, sizeof(outputLog));
+    memset(everSeenBitfield, 0, sizeof(everSeenBitfield));
 }
 
 DeviceManager::~DeviceManager() {
@@ -111,6 +112,21 @@ bool DeviceManager::isKnownDevice(const char* address) {
 }
 
 void DeviceManager::updateDevice(const char* address, const char* name, int rssi) {
+    // Ever-seen tracking: Simple Hash über MAC-Adresse
+    uint32_t hash = 0;
+    for (int i = 0; address[i] != '\0'; i++) {
+        hash = hash * 31 + (uint8_t)address[i];
+    }
+    uint8_t bitIndex = hash % 256;
+    uint8_t arrayIndex = bitIndex / 32;
+    uint8_t bitPosition = bitIndex % 32;
+    
+    // Prüfe ob Gerät bereits jemals gesehen wurde
+    if (!(everSeenBitfield[arrayIndex] & (1 << bitPosition))) {
+        everSeenBitfield[arrayIndex] |= (1 << bitPosition);
+        totalEverSeen++;
+    }
+    
     // Find existing device or create new one
     int deviceIndex = -1;
     for (int i = 0; i < deviceCount; i++) {
@@ -345,4 +361,24 @@ void DeviceManager::clearOutputLog() {
     outputLogCount = 0;
     outputLogIndex = 0;
     memset(outputLog, 0, sizeof(outputLog));
+}
+
+int DeviceManager::getActiveCount() const {
+    int count = 0;
+    for (int i = 0; i < deviceCount; i++) {
+        if (devices[i].isActive) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int DeviceManager::getPresentCount() const {
+    int count = 0;
+    for (int i = 0; i < deviceCount; i++) {
+        if (devices[i].isActive && devices[i].isKnown && devices[i].rssi >= devices[i].rssiThreshold) {
+            count++;
+        }
+    }
+    return count;
 }

@@ -152,7 +152,7 @@ String WebUI::buildStatusBar() {
         "<div class=\"status-bar\">"
         "<div id=\"status-wifi\" class=\"status-item\">WiFi: Verbinde...</div>"
         "<div id=\"status-wifimode\" class=\"status-item\">Modus: -</div>"
-        "<div id=\"status-ever\" class=\"status-item\">📈 Geräte (seit Boot): <span id=\"stat-ever\">0</span></div>"
+        "<div id=\"status-ever\" class=\"status-item\">📈 Geräte (ever): <span id=\"stat-ever\">0</span></div>"
         "<div id=\"status-known\" class=\"status-item\">⭐ Bekannt: <span id=\"stat-known\">0</span></div>"
         "<div id=\"status-active\" class=\"status-item\">🟢 Aktiv: <span id=\"stat-active\">0</span></div>"
         "<div id=\"status-present\" class=\"status-item\">✅ Anwesend: <span id=\"stat-present\">0</span></div>"
@@ -263,14 +263,8 @@ String WebUI::buildCoreFunctions() {
         "setTimeout(()=>{n.className='notification';},4000);"
         "}\n"
         
-        // Stats update
+        // Stats update (wird jetzt vom Server geliefert)
         "function updateStats(){"
-        "const known=devices.filter(d=>d.known).length;"
-        "const active=devices.filter(d=>d.active).length;"
-        "const present=devices.filter(d=>d.proximityStatus==='green').length;"
-        "document.getElementById('stat-known').textContent=known;"
-        "document.getElementById('stat-active').textContent=active;"
-        "document.getElementById('stat-present').textContent=present;"
         "}\n"
         
         // Proximity status text
@@ -296,7 +290,6 @@ String WebUI::buildDevicesFunctions() {
         "fetch('/api/devices').then(r=>r.json()).then(d=>{"
         "devices=d.devices||[];"
         "knownDevices=d.knownDevices||[];"
-        "updateStats();"
         "filterDevices();"
         "renderKnownDevices();"
         "}).catch(err=>{console.error(err);showNotification('Fehler beim Laden der Geräte',true);});"
@@ -311,6 +304,9 @@ String WebUI::buildDevicesFunctions() {
         "document.getElementById('status-wifi').className='status-item'+(s.wifi_connected?' online':'');"
         "document.getElementById('status-uptime').textContent='Uptime: '+s.uptime;"
         "document.getElementById('stat-ever').textContent=s.devices_ever||0;"
+        "document.getElementById('stat-known').textContent=s.known||0;"
+        "document.getElementById('stat-active').textContent=s.devices||0;"
+        "document.getElementById('stat-present').textContent=s.present||0;"
         "}).catch(e=>console.error(e));"
         "loadOutputLog();"
         "}\n"

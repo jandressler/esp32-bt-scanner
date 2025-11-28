@@ -71,6 +71,10 @@ private:
     int outputLogCount;
     int outputLogIndex;  // Ringpuffer-Index
     
+    // Ever-seen tracking (Bitfeld für RAM-effizientes Tracking)
+    uint32_t everSeenBitfield[8];  // 256 bits = 256 mögliche Geräte-Hashes
+    int totalEverSeen;
+    
 public:
     DeviceManager();
     ~DeviceManager();
@@ -101,8 +105,11 @@ public:
     void clearOutputLog();
     
     // Getters
-    int getDeviceCount() const { return deviceCount; }
-    int getKnownCount() const { return knownCount; }
+    int getDeviceCount() const { return deviceCount; }  // Aktiv (current seen)
+    int getKnownCount() const { return knownCount; }    // Bekannt (saved)
+    int getTotalEverSeen() const { return totalEverSeen; }  // Geräte ever seen
+    int getActiveCount() const;  // Aktiv (current seen)
+    int getPresentCount() const;  // Anwesend (current seen + near)
     SafeDevice* getDevices() { return devices; }
     char (*getKnownMACs())[18] { return knownMACs; }
     char (*getKnownComments())[50] { return knownComments; }
