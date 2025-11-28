@@ -66,12 +66,18 @@ void DeviceManager::saveKnownDevices() {
 }
 
 int DeviceManager::addKnownDevice(const char* address, const char* comment, int rssiThreshold) {
-    if (knownCount >= MAX_KNOWN) return -1;  // Array full
+    if (knownCount >= MAX_KNOWN) {
+        return -1;  // Array full
+    }
     
-    // Check if already known
+    // Check if already known - if yes, update it
     for (int i = 0; i < knownCount; i++) {
         if (strcmp(knownMACs[i], address) == 0) {
-            return i;  // Already exists
+            // Update existing entry
+            strncpy(knownComments[i], comment, sizeof(knownComments[i]) - 1);
+            knownRSSIThresholds[i] = rssiThreshold;
+            saveKnownDevices();
+            return i;  // Return existing index
         }
     }
     
@@ -275,24 +281,61 @@ bool DeviceManager::importDevicesJson(const String& jsonData) {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, jsonData);
     
-    if (error) return false;
+    if (error) {
+        logOutputChange("", "", "", false, "Import fehlgeschlagen: JSON ungültig");
+        return false;
+    }
     
-    if (!doc.containsKey("knownDevices")) return false;
+    if (!doc["knownDevices"].is<JsonArray>()) {
+        logOutputChange("", "", "", false, "Import fehlgeschlagen: knownDevices fehlt");
+        return false;
+    }
     
     JsonArray knownArray = doc["knownDevices"];
     int importCount = 0;
+    int updateCount = 0;
+    int skippedCount = 0;
+    int startCount = knownCount;
     
     for (JsonObject knownObj : knownArray) {
         const char* address = knownObj["address"];
         const char* comment = knownObj["comment"] | "";
         int rssiThreshold = knownObj["rssiThreshold"] | DEFAULT_RSSI_THRESHOLD;
         
-        if (address && addKnownDevice(address, comment, rssiThreshold) >= 0) {
-            importCount++;
+        if (address && strlen(address) > 0) {
+            // Check if device existed before
+            bool existed = false;
+            for (int i = 0; i < startCount; i++) {
+                if (strcmp(knownMACs[i], address) == 0) {
+                    existed = true;
+                    break;
+                }
+            }
+            
+            int result = addKnownDevice(address, comment, rssiThreshold);
+            if (result >= 0) {
+                if (existed) {
+                    updateCount++;
+                } else {
+                    importCount++;
+                }
+            } else {
+                skippedCount++;
+            }
         }
     }
     
-    return importCount > 0;
+    // Einzige Log-Meldung mit Zusammenfassung
+    char logMsg[120];
+    if (importCount > 0 || updateCount > 0) {
+        snprintf(logMsg, sizeof(logMsg), "📥 Import: %d neu, %d aktualisiert%s", 
+                 importCount, updateCount, skippedCount > 0 ? ", einige übersprungen" : "");
+    } else {
+        snprintf(logMsg, sizeof(logMsg), "📥 Import: Keine Änderungen (%d bereits vorhanden)", updateCount + importCount);
+    }
+    logOutputChange("", "", "", false, logMsg);
+    
+    return (importCount + updateCount + skippedCount) > 0;
 }
 
 // Output Log System Implementation

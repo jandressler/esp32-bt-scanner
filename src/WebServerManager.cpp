@@ -110,8 +110,8 @@ void WebServerManager::setupMainServerRoutes() {
         handleExportDevicesFile(request);
     });
     
-    server->on("/api/import-devices-file", HTTP_POST, [this](AsyncWebServerRequest *request){
-        // Empty handler - body processing happens in body handler
+    server->on("/api/import-devices", HTTP_POST, [this](AsyncWebServerRequest *request){
+        // Response wird im body handler gesendet
     }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
         handleImportDevicesFile(request, data, len, index, total);
     });
@@ -453,30 +453,40 @@ void WebServerManager::handleSetKnownDevice(AsyncWebServerRequest *request) {
 void WebServerManager::handleExportDevicesFile(AsyncWebServerRequest *request) {
     String jsonData = deviceManager->exportDevicesJson();
     
+    // Log Export
+    char logMsg[80];
+    snprintf(logMsg, sizeof(logMsg), "📤 Export: %d Geräte exportiert", deviceManager->getKnownCount());
+    deviceManager->logOutputChange("", "", "", false, logMsg);
+    
     request->send(200, "application/json", jsonData);
 }
 
 void WebServerManager::handleImportDevicesFile(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    static String bodyBuffer = "";
-    
-    // Sammle alle Body-Daten
-    if (index == 0) {
-        bodyBuffer = "";
+    // Nutze Request-Objekt um Buffer zu speichern (sicherer als static)
+    if (!request->_tempObject) {
+        request->_tempObject = new String();
     }
     
+    String* bodyBuffer = (String*)request->_tempObject;
+    
+    // Sammle Daten
     for (size_t i = 0; i < len; i++) {
-        bodyBuffer += (char)data[i];
+        *bodyBuffer += (char)data[i];
     }
     
     // Verarbeite nur wenn alle Daten empfangen wurden
     if (index + len == total) {
-        bool success = deviceManager->importDevicesJson(bodyBuffer);
+        bool success = deviceManager->importDevicesJson(*bodyBuffer);
         
         if (success) {
             sendJSONResponse(request, "success", "Geräte erfolgreich importiert");
         } else {
             sendJSONResponse(request, "error", "Import fehlgeschlagen - ungültige Daten");
         }
+        
+        // Cleanup
+        delete bodyBuffer;
+        request->_tempObject = nullptr;
     }
 }
 
