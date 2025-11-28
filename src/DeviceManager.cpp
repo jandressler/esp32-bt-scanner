@@ -142,9 +142,23 @@ void DeviceManager::updateDevice(const char* address, const char* name, int rssi
         }
     }
     
-    if (deviceIndex == -1 && deviceCount < MAX_DEVICES) {
-        // Create new device
-        deviceIndex = deviceCount++;
+    if (deviceIndex == -1) {
+        if (deviceCount < MAX_DEVICES) {
+            // Create new device
+            deviceIndex = deviceCount++;
+        } else {
+            // LRU-Ersatz: Ältestes Gerät (kleinstes lastSeen) ersetzen
+            unsigned long oldestTs = ULONG_MAX;
+            int oldestIdx = 0;
+            for (int i = 0; i < deviceCount; i++) {
+                unsigned long ts = devices[i].lastSeen;
+                if (ts == 0 || ts < oldestTs) {
+                    oldestTs = ts;
+                    oldestIdx = i;
+                }
+            }
+            deviceIndex = oldestIdx;
+        }
         memset(&devices[deviceIndex], 0, sizeof(SafeDevice));
         strncpy(devices[deviceIndex].address, address, sizeof(devices[deviceIndex].address) - 1);
         devices[deviceIndex].firstSeenThisSession = millis();

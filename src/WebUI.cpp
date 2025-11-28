@@ -399,7 +399,7 @@ String WebUI::buildKnownDevicesFunctions() {
         "dialog.innerHTML='<div style=\"background:white;padding:20px;border-radius:12px;width:90%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,0.3)\">'"
         "+'<h3 style=\"margin:0 0 15px\">Gerät hinzufügen</h3>'"
         "+'<p style=\"color:#666;margin-bottom:15px\">MAC: '+address+'</p>'"
-        "+'<input type=\"text\" id=\"device-comment\" placeholder=\"Kommentar (z.B. iPhone von Max)\" style=\"width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:10px\">'"
+        "+'<input type=\"text\" id=\"device-comment\" maxlength=\"32\" placeholder=\"Kommentar (z.B. iPhone von Max)\" style=\"width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:10px\">'"
         "+'<input type=\"number\" id=\"device-threshold\" value=\"-80\" placeholder=\"RSSI Schwellwert\" style=\"width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:15px\">'"
         "+'<div style=\"display:flex;gap:10px\">'"
         "+'<button onclick=\"addKnownDevice(\\''+address+'\\')\" style=\"flex:1;background:#007aff;color:white;border:none;padding:12px;border-radius:6px;cursor:pointer\">Hinzufügen</button>'"

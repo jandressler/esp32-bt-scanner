@@ -39,8 +39,8 @@ struct SafeDevice {
     uint16_t manufacturerId;
 };
 
-#define MAX_DEVICES 8
-#define MAX_KNOWN 3
+#define MAX_DEVICES 32
+#define MAX_KNOWN 200
 #define MAX_OUTPUT_LOG_ENTRIES 30
 
 // Output Log Entry für Ausgang-Schaltungen
@@ -60,7 +60,7 @@ class DeviceManager {
 private:
     SafeDevice* devices;
     char knownMACs[MAX_KNOWN][18];
-    char knownComments[MAX_KNOWN][50];
+    char knownComments[MAX_KNOWN][MAX_COMMENT_LENGTH];
     int knownRSSIThresholds[MAX_KNOWN];
     int deviceCount;
     int knownCount;
@@ -112,7 +112,7 @@ public:
     int getPresentCount() const;  // Anwesend (current seen + near)
     SafeDevice* getDevices() { return devices; }
     char (*getKnownMACs())[18] { return knownMACs; }
-    char (*getKnownComments())[50] { return knownComments; }
+    char (*getKnownComments())[MAX_COMMENT_LENGTH] { return knownComments; }
     int* getKnownRSSIThresholds() { return knownRSSIThresholds; }
 };
 

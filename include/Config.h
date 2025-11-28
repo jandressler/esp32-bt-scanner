@@ -43,6 +43,7 @@
 #define MAX_KNOWN_DEVICES 20
 #define DEVICE_TIMEOUT_MS 120000        // 2 Minuten bis Gerät als "weg" gilt
 #define DEFAULT_RSSI_THRESHOLD -80      // Standard RSSI-Grenzwert in dBm
+#define MAX_COMMENT_LENGTH 32           // Maximale Kommentarlänge für bekannte Geräte
 
 // =================== LED KONFIGURATION ===================
 #define LED_BUILTIN_PIN 8

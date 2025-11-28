@@ -87,6 +87,11 @@ void WebServerManager::setupMainServerRoutes() {
         deviceManager->clearOutputLog();
         sendJSONResponse(request, "success", "Output-Log gelöscht");
     });
+    // Test-Endpoint für Output-Log
+    server->on("/api/output-log/test", HTTP_POST, [this](AsyncWebServerRequest *request){
+        deviceManager->logOutputChange("", "System", "Test", true, "Test-Logeintrag erstellt");
+        sendJSONResponse(request, "success", "Test-Logeintrag erstellt");
+    });
     
     server->on("/api/wifi/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
         handleWiFiReset(request);
@@ -273,6 +278,11 @@ void WebServerManager::handleStatusAPI(AsyncWebServerRequest *request) {
     doc["present"] = deviceManager->getPresentCount();  // Anwesend (seen+near)
     doc["wifi_connected"] = wifiManager.isConnected();
     doc["wifi_ssid"] = wifiManager.getSSID();
+    doc["wifi_rssi"] = WiFi.isConnected() ? WiFi.RSSI() : 0;
+    doc["wifi_ip"] = wifiManager.getLocalIP();
+    doc["wifi_gateway"] = WiFi.isConnected() ? WiFi.gatewayIP().toString() : "";
+    doc["wifi_subnet"] = WiFi.isConnected() ? WiFi.subnetMask().toString() : "";
+    doc["wifi_dns"] = WiFi.isConnected() ? WiFi.dnsIP().toString() : "";
     doc["wifi_mode"] = wifiManager.isConnected() ? "Station" : (wifiManager.isInAPMode() ? "Access Point" : "---");
     doc["heap_free"] = ESP.getFreeHeap();
     
@@ -333,7 +343,7 @@ void WebServerManager::handleDevicesAPI(AsyncWebServerRequest *request) {
     // Bekannte Geräte (auch wenn nicht anwesend)
     JsonArray knownArray = doc["knownDevices"].to<JsonArray>();
     char (*knownMACs)[18] = deviceManager->getKnownMACs();
-    char (*knownComments)[50] = deviceManager->getKnownComments();
+    char (*knownComments)[MAX_COMMENT_LENGTH] = deviceManager->getKnownComments();
     int* knownThresholds = deviceManager->getKnownRSSIThresholds();
     
     for (int i = 0; i < deviceManager->getKnownCount(); i++) {

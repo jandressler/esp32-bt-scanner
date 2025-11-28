@@ -9,72 +9,75 @@
 Ein professionelles IoT-System für den ESP32-C3, das Bluetooth-Geräte scannt, eine moderne Web-Oberfläche bereitstellt und als Gateway für Home Automation Systeme wie Loxone fungiert. Entwickelt für 24/7-Betrieb mit robusten Sicherheits- und Monitoring-Features.
 
 ## 🎯 Hauptfunktionen
-
-### 🔍 Bluetooth Low Energy (BLE) Scanner
-- **Kontinuierliches Scanning**: 2s scan + 8s pause Zyklus (optimiert für Stabilität)
-- **Erweiterte Payload-Analyse**: Automatische Herstellererkennung (Apple, Samsung, Google, Xiaomi, etc.)
-- **RSSI-basierte Proximity-Erkennung**: Konfigurierbare Schwellenwerte pro Gerät (-60 bis -90 dBm)
-- **Intelligente Gerätefilterung**: 2min Timeout, automatische Cleanup-Routinen
-- **Payload-Hex-Dump**: Vollständige BLE-Advertising-Daten für Entwickler
-
-### 📶 WiFiManager Captive Portal ⭐ **PLUG & PLAY**
-- **Zero-Config Setup**: Keine Hardcodierung von WLAN-Credentials
-- **Offenes WLAN**: `ESP32-BT-Scanner` ohne Passwort für einfaches Setup
-- **Captive Portal**: Automatische Browser-Weiterleitung bei Verbindung
-- **Hardware WiFi-Reset**: Boot-Button 3s drücken → komplettes Reset
-- **Dual-Mode Support**: Station + Access Point Modi mit intelligenter Umschaltung
-- **2.4GHz Optimiert**: Bluetooth temporär deaktiviert während WiFi-Setup
-
-### 🐕 Hardware Watchdog ⭐ **ENTERPRISE-GRADE**
-- **30s Hardware-Timeout**: ESP32-C3 integrierter Watchdog
-- **Automatische Recovery**: Neustart bei System-Hängern ohne manuellen Eingriff
-- **API-basiertes Reset**: Remote-Management über `/api/system/reset`
-- **WiFi-Credentials Reset**: `/api/wifi/reset` für Remote-Neukonfiguration
-- **Visual Feedback**: LED-Blinkmuster bei Reset-Operationen
-
 ### 🌐 Modernes Web-Interface
 - **Responsive Design**: Mobile-First Ansatz, Touch-optimiert
-- **Echtzeit-Updates**: WebSocket-ähnliches Polling alle 3 Sekunden
+- **Aktualisierung**: On-Demand (Button/Seitenreload), kein Auto-Polling
+- **Moderne Oberfläche**: Schlanke UI mit klarer Typografie
+- **Dialog-Overlays**: Geräteverwaltung mit RSSI-Threshold-Einstellung
+- **Payload-Hex-Dump**: Vollständige BLE-Advertising-Daten für Entwickler
+### 💾 Backup & Restore
+- **JSON-Export**: Download der bekannten Geräte
+- **Import**: Browser-native File-API
+- **Konfliktfrei**: Bestehende Geräte werden aktualisiert
+- **Validierung**: Basis-JSON-Parsing ohne Schema-Validierung
+- **Hardware WiFi-Reset**: Boot-Button 3s drücken → komplettes Reset
+### 📊 System Status API
+  "wifi": {
+    "connected": true,
+    "ssid": "HomeNetwork",
+    "ip": "192.168.1.100",
+    "rssi": -45,
+    "gateway": "192.168.1.1",
+    "subnet": "255.255.255.0",
+    "dns": "8.8.8.8"
+  },
+- **API-basiertes Reset**: Remote-Management über `/api/system/reset`
+### 📝 Output Log API
+POST /api/output-log/clear    # Log löschen
+POST /api/output-log/test     # Test-Eintrag erstellen
+
+### 💾 Backup & Restore API
+GET  /api/export-devices-file
+Content-Type: application/json
+Content-Disposition: attachment; filename="devices.json"
 - **Material Design**: Moderne UI/UX mit Animationen und Transitions
-- **Progressive Web App**: Offline-fähige Funktionen
-- **Dark Mode Support**: Automatische Theme-Erkennung
-- **Modal-Dialoge**: Intuitive Geräteverwaltung mit RSSI-Threshold-Einstellung
+```http
+POST /api/import-devices
+Content-Type: application/json
+Body: {JSON backup data}
 
-### 🏠 Home Automation Integration
-- **GPIO 4 Relais-Ausgang**: 3.3V Logic-Level für Standard-Relais-Module
-- **GPIO 8 LED-Anzeige**: ESP32-C3 onboard LED (invertierte Logik)
-- **Synchrone Ausgänge**: LED + Relais parallel geschaltet
-- **Loxone HTTP-API**: Text/Plain Antworten für direkte Miniserver-Integration
-- **Output-Log-System**: 30-Entry Ringbuffer mit vollständiger Nachverfolgung
-
-### 💾 Enterprise Backup & Restore System
-- **Echter Datei-Export**: JSON-Download mit ISO-8601 Timestamps
-- **Drag & Drop Import**: Browser-native File-API Integration
-- **Structured Data Format**: Versionierte JSON-Schemas mit Metadaten
-- **Merge-Import-Logic**: Konfliktfreie Imports ohne Duplikate
-- **Backup-Validation**: JSON-Schema-Validierung vor Import
-
-## 📸 Screenshot
-![Screenshot Main-Page](./screenshot.png)
-
-## 📋 Hardware-Spezifikationen
-
-### ESP32-C3 DevKitM-1 System Requirements
-```yaml
-MCU: ESP32-C3 (RISC-V 160MHz single-core)
-RAM: 320KB SRAM (68.812 bytes verwendet = 21.5%)
-Flash: 4MB (1.499.494 bytes verwendet = 47.7%)
-WiFi: IEEE 802.11 b/g/n 2.4GHz
-Bluetooth: BLE 5.0 mit Mesh-Support
-GPIO: 22 digital I/O pins (GPIO 0-21)
-ADC: 6x 12-bit ADC channels
-Power: 3.3V, 500mA typical, 1A peak
-USB: USB-C mit automatischem Download-Modus
+Response:
+{
+  "status": "success",
+  "message": "Geräte erfolgreich importiert"
+}
 ```
 
-### GPIO-Pin-Belegung
-```cpp
-#define LED_BUILTIN_PIN     8   // Onboard RGB LED (invertierte Logik)
+## 🏠 Loxone Home Automation Integration
+GET /loxone/device?address={MAC}
+Content-Type: text/plain
+Response: "present" | "absent" | "unknown"
+- **Structured Data Format**: Versionierte JSON-Schemas mit Metadaten
+### Ideen & mögliche Erweiterungen
+- **Backup-Validation**: JSON-Schema-Validierung vor Import
+Mögliche Ideen:
+  - MQTT / Home Assistant Integration
+  - Mobile App / Push Notifications
+  - WebSockets für echte Echtzeit-Updates
+  - Erweiterte Analytics
+GPIO: 22 digital I/O pins (GPIO 0-21)
+ADC: 6x 12-bit ADC channels
+## 📊 Projekt-Status
+
+**Aktueller Stand (funktional, laufend weiterentwickelt)**
+
+### ✅ Core Features
+USB: USB-C mit automatischem Download-Modus
+### ✅ Performance & Reliability
+
+### ✅ Documentation & Support
+Flash: 4MB (~1.506.000 bytes verwendet ≈ 47.9%)
+**Updates**: 3s HTTP-Polling Intervall
 #define RELAY_OUTPUT_PIN    4   // Relais-Ausgang (3.3V Logic)
 #define WIFI_RESET_BUTTON   0   // Boot-Button (Hardware-Reset)
 ```
@@ -463,7 +466,7 @@ if (!isDevicePresent) {
 }
 ```
 
-## 🏭 24V Industrie-Integration
+## 🏭 24V Industrie-Integration (optional)
 
 ### Professionelle 24V-Setup-Architektur
 
