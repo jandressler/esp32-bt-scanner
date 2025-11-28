@@ -24,6 +24,18 @@
 				"$platformio"
 			],
 			"group": "build"
+		},
+		{
+			"label": "PlatformIO Build (Beacon)",
+			"type": "shell",
+			"command": "platformio",
+			"args": [
+				"run",
+				"-d",
+				"/home/jdressler/Dokumente/PlatformIO/Projects/bt_scanner/beacon"
+			],
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }
