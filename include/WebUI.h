@@ -17,25 +17,21 @@ public:
     static String generateMainHTML();
     static String generateModeSetupHTML(const String& beaconName, const BeaconConfig& beaconConfig);
     
-private:
-    // ========== CSS Styles ==========
+    // Public build functions for chunked response
     static String buildStyles();
-    
-    // ========== HTML Structure ==========
     static String buildHTMLHeader();
     static String buildHTMLFooter();
-    
-    // ========== Main UI Sections ==========
     static String buildPageHeader();
-    static String buildStatusBar();
     static String buildControlsSection();
     static String buildDevicesSection();
     static String buildKnownDevicesSection();
     static String buildOutputLogSection();
     static String buildNotificationContainer();
-    
-    // ========== JavaScript ==========
     static String buildMainScript();
+    
+private:
+    // ========== Main UI Sections ==========
+    static String buildStatusBar();
     
     // JavaScript - Core Functions
     static String buildCoreFunctions();

@@ -215,13 +215,15 @@ void loop() {
         updateLEDStatus();
     }
     
-    delay(50); // Small pause for task switching
+    delay(100); // Small pause for task switching
 }
 
 void initializeWatchdog() {
     if (WATCHDOG_ENABLED) {
+        // Initialize with panic on timeout, but only for main loop task
+        // AsyncWebServer runs on separate tasks, should not be watched
         esp_task_wdt_init(WATCHDOG_TIMEOUT_SEC, true);
-        esp_task_wdt_add(NULL);
+        esp_task_wdt_add(NULL);  // Add only current task (loop)
     }
 }
 

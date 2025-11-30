@@ -6,7 +6,7 @@
 
 String WebUI::generateMainHTML() {
     String html;
-    html.reserve(8192); // Pre-allocate to reduce reallocations
+    html.reserve(32768); // Massiv erhöht: 32KB für große HTML mit JavaScript
     
     html += buildHTMLHeader();
     html += buildStyles();
@@ -239,7 +239,7 @@ String WebUI::buildNotificationContainer() {
 
 String WebUI::buildMainScript() {
     String script;
-    script.reserve(4096);
+    script.reserve(16384); // JavaScript ist groß - 16KB reservieren
     
     script += "<script>\n";
     script += buildCoreFunctions();
@@ -261,6 +261,7 @@ String WebUI::buildCoreFunctions() {
     return String(
         // State
         "let devices=[];let knownDevices=[];let filteredDevices=[];\n"
+        "let isLoading=false;\n"
         
         // Notification
         "function showNotification(m,e){"
@@ -292,15 +293,17 @@ String WebUI::buildCoreFunctions() {
 
 String WebUI::buildDevicesFunctions() {
     return String(
-        // Load devices and status
+        // Load devices and status - SEQUENTIAL to avoid parallel overload
         "function loadDevices(){"
+        "if(isLoading){console.log('Already loading, skip');return;}"
+        "isLoading=true;"
         "fetch('/api/devices').then(r=>r.json()).then(d=>{"
         "devices=d.devices||[];"
         "knownDevices=d.knownDevices||[];"
         "filterDevices();"
         "renderKnownDevices();"
-        "}).catch(err=>{console.error(err);showNotification('Fehler beim Laden der Geräte',true);});"
-        "fetch('/api/status').then(r=>r.json()).then(s=>{"
+        "return fetch('/api/status');"
+        "}).then(r=>r.json()).then(s=>{"
         "document.getElementById('scan-status').textContent=s.scanning?'Scannt...':'Pause';"
         "document.getElementById('output-status').textContent=s.outputActive?'AN':'AUS';"
         "document.getElementById('status-scan').className='status-item'+(s.scanning?' online':'');"
@@ -314,8 +317,8 @@ String WebUI::buildDevicesFunctions() {
         "document.getElementById('stat-known').textContent=s.known||0;"
         "document.getElementById('stat-active').textContent=s.devices||0;"
         "document.getElementById('stat-present').textContent=s.present||0;"
-        "}).catch(e=>console.error(e));"
         "loadOutputLog();"
+        "}).catch(e=>{console.error(e);showNotification('Fehler beim Laden',true);}).finally(()=>{isLoading=false;});"
         "}\n"
         
         // Filter devices

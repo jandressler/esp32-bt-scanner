@@ -59,7 +59,7 @@ enum DeviceMode {
 
 // =================== WATCHDOG KONFIGURATION ===================
 #define WATCHDOG_TIMEOUT_SEC 30   // 30 Sekunden Watchdog-Timeout
-#define WATCHDOG_ENABLED true     // Watchdog aktivieren
+#define WATCHDOG_ENABLED true     // Watchdog als Sicherheitsnetz
 
 // =================== WEBSERVER KONFIGURATION ===================
 #define WEBSERVER_PORT 80

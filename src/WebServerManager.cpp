@@ -75,8 +75,22 @@ void WebServerManager::setupMainServerRoutes() {
             handleModeSetup(request);
             return;
         }
-        String page = WebUI::generateMainHTML();
-        request->send(200, "text/html", page);
+        // Chunked response um Heap-Probleme zu vermeiden
+        AsyncResponseStream *response = request->beginResponseStream("text/html");
+        response->addHeader("Connection", "close");
+        response->print(WebUI::buildHTMLHeader());
+        response->print(WebUI::buildStyles());
+        response->print("</head><body><div class=\"container\">");
+        response->print(WebUI::buildPageHeader());
+        response->print(WebUI::buildControlsSection());
+        response->print(WebUI::buildDevicesSection());
+        response->print(WebUI::buildKnownDevicesSection());
+        response->print(WebUI::buildOutputLogSection());
+        response->print("</div>");
+        response->print(WebUI::buildNotificationContainer());
+        response->print(WebUI::buildMainScript());
+        response->print(WebUI::buildHTMLFooter());
+        request->send(response);
     });
     
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -254,9 +268,10 @@ void WebServerManager::handleScanNetworks(AsyncWebServerRequest *request) {
         network["auth"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
     }
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
 }
 
 String WebServerManager::formatRelativeTime(unsigned long seconds) {
@@ -311,9 +326,10 @@ void WebServerManager::handleStatusAPI(AsyncWebServerRequest *request) {
     doc["scanning"] = bluetoothScanner->isScanning();
     doc["outputActive"] = digitalRead(LED_BUILTIN_PIN) == LOW; // LED AN = LOW wegen invertierter Logik
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
 }
 
 void WebServerManager::handleDevicesAPI(AsyncWebServerRequest *request) {
@@ -405,9 +421,10 @@ void WebServerManager::handleDevicesAPI(AsyncWebServerRequest *request) {
         knownDevice["proximityStatus"] = proximityStatus;
     }
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
 }
 
 void WebServerManager::handleFactoryReset(AsyncWebServerRequest *request) {
@@ -417,9 +434,10 @@ void WebServerManager::handleFactoryReset(AsyncWebServerRequest *request) {
     
     wifiManager.resetWiFiSettings();
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
     
     delay(100);
     ESP.restart();
@@ -428,11 +446,12 @@ void WebServerManager::handleFactoryReset(AsyncWebServerRequest *request) {
 void WebServerManager::handleSystemReboot(AsyncWebServerRequest *request) {
     JsonDocument doc;
     doc["status"] = "success";
-    doc["message"] = "System wird neu gestartet...";
+    doc["message"] = "Neustart wird durchgeführt...";
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
     
     delay(100);
     ESP.restart();
@@ -450,9 +469,10 @@ void WebServerManager::handleBluetoothReset(AsyncWebServerRequest *request) {
         doc["message"] = "Bluetooth-Scanner nicht verfügbar";
     }
     
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->addHeader("Connection", "close");
+    serializeJson(doc, *response);
+    request->send(response);
 }
 
 void WebServerManager::handleSetKnownDevice(AsyncWebServerRequest *request) {
