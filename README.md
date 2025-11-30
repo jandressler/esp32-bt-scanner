@@ -53,6 +53,8 @@ Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche
 - **Max. Schaltleistung**: Abhängig vom verwendeten Relais-Modul
 - **Anwendungen**: Türöffner, Garagentore, Beleuchtung, Schütze
 
+![Screenshot Main-Page](./screenshot.png)
+
 ## 🔧 Installation & Konfiguration
 
 ### Voraussetzungen
@@ -85,6 +87,7 @@ Boot-Button (GPIO9) >4 Sekunden halten
 → Setup-Portal startet als WiFi-AP "ESP32-BT-Scanner"
 → Automatisches Captive Portal öffnet sich
 ```
+![Screenshot Setup-Page auf dem Telefon](./screenshot_setup.png)
 
 **Im Setup-Portal verfügbar:**
 1. **Beacon-Konfiguration** (bleibt im Beacon-Mode):
@@ -368,7 +371,7 @@ Response:
 ```
 
 ```http
-POST /api/import-devices-file
+POST /api/import-devices
 Content-Type: application/json
 Body: {JSON backup data}
 
@@ -382,9 +385,58 @@ Response:
 ### 🔧 System Management API
 
 ```http
-POST /api/system/reset         # ESP32 Neustart
-POST /api/wifi/reset          # WiFi-Credentials löschen
+POST /api/system/reboot       # ESP32 Neustart (ohne Änderungen)
+POST /api/factory-reset       # WiFi-Credentials löschen + Neustart (Gerät geht offline!)
 POST /api/bluetooth/reset     # Bluetooth-Stack neustart
+GET  /health                  # Health check für Monitoring (Response: "ok")
+```
+
+### 🔌 Setup & Netzwerk API
+
+```http
+GET  /api/scan
+Content-Type: application/json
+
+# Netzwerk-Scan für WiFi-Setup
+Response:
+{
+  "status": "success",
+  "networks": [
+    {
+      "ssid": "HomeNetwork",
+      "rssi": -45,
+      "auth": true
+    }
+  ]
+}
+```
+
+```http
+POST /setup/wifi
+Content-Type: application/json
+
+# WiFi-Konfiguration (intern vom Setup-Portal verwendet)
+Body:
+{
+  "ssid": "HomeNetwork",
+  "password": "secret",
+  "scanner": true,
+  "static_ip": "192.168.1.100",  # optional
+  "gateway": "192.168.1.1",       # optional
+  "subnet": "255.255.255.0",      # optional
+  "dns": "8.8.8.8"                # optional
+}
+```
+
+```http
+POST /setup/ap
+Content-Type: application/json
+
+# Access Point Passwort setzen (intern vom Setup-Portal verwendet)
+Body:
+{
+  "password": "min8chars"
+}
 ```
 
 ## 🏠 Loxone Home Automation Integration
@@ -445,74 +497,26 @@ curl http://192.168.1.100/loxone/presence
 # Haupt-Anwesenheitsstatus für Gebäude-Automation
 ```
 
-## ⚡ Hardware-Integration Details
+## ⚡ Hardware-Ausgänge
 
-### LED-Steuerung (GPIO 8)
-```cpp
-// ESP32-C3 onboard RGB LED - Invertierte Logik
-#define LED_BUILTIN_PIN 8
+### LED-Status (GPIO 8)
+- **Onboard RGB-LED** zeigt Anwesenheitsstatus
+- **AN** (leuchtet): Mindestens 1 bekanntes Gerät in Reichweite
+- **AUS**: Kein bekanntes Gerät erkannt
+- Invertierte Logik: LOW = AN, HIGH = AUS
 
-// LED-Status-Mapping
-digitalWrite(LED_BUILTIN_PIN, LOW);   // LED AN  (present = true)
-digitalWrite(LED_BUILTIN_PIN, HIGH);  // LED AUS (present = false)
+### Relais-Ausgang (GPIO 4)
+- **3.3V Logic-Level** für Relais-Module
+- **HIGH**: Mindestens 1 bekanntes Gerät erkannt
+- **LOW**: Kein bekanntes Gerät in Reichweite
+- Synchron mit LED geschaltet
 
-// Blink-Pattern für Feedback
-void blinkLED(int times, int delayMs) {
-    for(int i = 0; i < times; i++) {
-        digitalWrite(LED_BUILTIN_PIN, LOW);   // AN
-        delay(delayMs);
-        digitalWrite(LED_BUILTIN_PIN, HIGH);  // AUS
-        delay(delayMs);
-    }
-}
-```
-
-### Relais-Steuerung (GPIO 4)
-```cpp
-// Standard Logic-Level Relais
-#define RELAY_OUTPUT_PIN 4
-
-// Relais-Steuerung
-digitalWrite(RELAY_OUTPUT_PIN, HIGH);  // Relais AN  (present = true)
-digitalWrite(RELAY_OUTPUT_PIN, LOW);   // Relais AUS (present = false)
-
-// Synchrone LED+Relais Steuerung
-void setPresenceOutput(bool devicePresent) {
-    digitalWrite(LED_BUILTIN_PIN, devicePresent ? LOW : HIGH);    // LED
-    digitalWrite(RELAY_OUTPUT_PIN, devicePresent ? HIGH : LOW);   // Relais
-    
-    // Log-Eintrag bei Statuswechsel
-    if (devicePresent != lastOutputState) {
-        deviceManager.logOutputChange(
-            triggerDevice, triggerName, triggerComment, 
-            devicePresent, 
-            devicePresent ? "Gerät erkannt" : "Kein bekanntes Gerät in Reichweite"
-        );
-        lastOutputState = devicePresent;
-    }
-}
-```
-
-### Anwesenheitserkennung-Logic
-```cpp
-// Proximity-Detection Algorithm
-bool isDevicePresent = false;
-for (int i = 0; i < deviceManager.getKnownCount(); i++) {
-    char* deviceMAC = deviceManager.getKnownMACs()[i];
-    int threshold = deviceManager.getKnownRSSIThresholds()[i];
-    
-    SafeDevice* device = findDevice(deviceMAC);
-    if (device && device->isActive && device->rssi >= threshold) {
-        isDevicePresent = true;
-        setPresenceOutput(true, device->address, device->name, device->comment);
-        break;
-    }
-}
-
-if (!isDevicePresent) {
-    setPresenceOutput(false, "", "", "");
-}
-```
+### Anwesenheitserkennung
+Prüft alle 10 Sekunden (nach jedem BLE-Scan):
+1. Durchsucht alle bekannten Geräte
+2. Vergleicht RSSI mit individuellem Schwellenwert
+3. Bei Treffer: LED + Relais AN, Log-Eintrag
+4. Kein Treffer: LED + Relais AUS
 
 ## 🏭 24V Industrie-Integration (optional)
 
@@ -629,89 +633,33 @@ Bluetooth Stack (BLE only):                   // ~15KB
 
 ## 🔍 Troubleshooting & Debug
 
-### WiFi-Probleme (Scanner Mode)
-```bash
-# Symptom: Captive Portal nicht erreichbar
-1. ESP32 Reset-Button drücken
-2. LED-Status prüfen: Dauerhaft AN = AP-Modus aktiv
-3. WLAN-Liste aktualisieren: "ESP32-BT-Scanner" suchen
-4. Näher zum ESP32 gehen (< 2m Entfernung)
-5. 2.4GHz Band aktiviert? (nicht 5GHz)
+### Häufige Probleme
 
-# Symptom: WLAN-Verbindung instabil
-1. Boot-Button (GPIO9) 4s drücken → Setup-Portal
-2. Captive Portal erneut durchlaufen
-3. Router-Firmware aktualisieren
-4. Kanal-Interferenzen prüfen (Kanal 1, 6, 11 bevorzugt)
+**WiFi verbindet nicht**
+- Boot-Button 4s halten → Setup-Portal öffnen
+- 2.4GHz WLAN verwenden (5GHz nicht unterstützt)
+- Näher am Router platzieren (< 5m für Setup)
 
-# Debug via Serial Monitor
-platformio device monitor --baud 115200
-# Hinweis: Standard-Code erzeugt keine Serial-Ausgaben; Diagnose über /api/status und /health
-```
+**Beacon nicht sichtbar**
+- BLE-Scanner-App nutzen (nRF Connect, LightBlue)
+- Beacon-Name: "BT-beacon_<MAC>"
+- Längeres Intervall = seltener sichtbar (normal bei >1000ms)
 
-### Beacon Mode Probleme
-```bash
-# Symptom: LED blinkt nicht
-1. Beacon läuft? Bei Start: 1x langes Blinken (1s)
-2. Intervall zu lang? Standard: 800ms
-3. GPIO8 verkabelt? LED intern auf ESP32-C3
+**Keine BLE-Geräte gefunden**
+- Web-Interface: "Bluetooth Reset" Button
+- Smartphone: Bluetooth aus/ein
+- RSSI-Schwellenwert anpassen (-60 → -80)
 
-# Symptom: BLE nicht sichtbar
-1. BLE-Scanner-App: nRF Connect, LightBlue
-2. Beacon-Name prüfen: Standard "BT-beacon_<MAC>"
-3. Advertising-Intervall: 100-10000ms (je länger, desto seltener sichtbar)
-4. Zurück zu Scanner-Mode: Boot-Button >4s → Setup-Portal → Scanner aktivieren
+**Gerät wird nicht erkannt**
+- RSSI-Threshold prüfen (Standard: -80)
+- Gerät näher bewegen (< 5m)
+- Output-Log auf Statuswechsel prüfen
+- 2min Timeout bis Gerät als "weg" gilt
 
-# Symptom: Stromverbrauch zu hoch (>50mA)
-1. USB-Serial-Chip: ~15-30mA Overhead (normal)
-2. Ohne USB messen: <15mA erwartet
-3. Intervall verkürzen = höherer Verbrauch (mehr Advertising)
-4. Light-Sleep aktiv? Code-Check: esp_light_sleep_start() aufgerufen
-
-# Mode zurücksetzen
-1. Boot-Button (GPIO9) 4s halten → Setup-Portal
-2. Captive Portal verbinden (ESP32-BT-Scanner)
-3. Setup-Seite → Scanner oder Beacon Mode wählen
-4. Konfiguration neu vornehmen
-```
-
-### Bluetooth-Probleme
-```bash
-# Symptom: Keine BLE-Geräte gefunden
-1. Web-Interface: "Bluetooth Reset" klicken
-2. System-Reset über API: curl -X POST http://IP/api/system/reset
-3. iOS: Bluetooth kurz aus/ein schalten
-4. Android: Flugmodus aus/ein schalten
-
-# Symptom: Bekannte Geräte nicht erkannt
-1. RSSI-Schwellenwerte prüfen (-60 zu hoch → -80)
-2. Gerät näher zum ESP32 bewegen
-3. Output-Log prüfen auf Status-Wechsel
-4. Device-Timeout: 2min ohne Signal = "weg"
-
-# BLE-Debug via Serial Monitor
-# Hinweis: BLE-Ereignisse erscheinen nicht seriell; Statuswechsel über Output-Log /api/output-log
-```
-
-### Web-Interface-Probleme
-```bash
-# Symptom: Seite lädt nicht
-1. IP-Adresse korrekt? (im Captive Portal angezeigt)
-2. Browser-Cache leeren: Ctrl+Shift+R (Chrome/Firefox)
-3. Anderer Browser testen (Safari, Edge)
-4. Firewall-Blockade prüfen (Port 80)
-
-# Symptom: Daten nicht aktuell
-1. "Aktualisieren" Button klicken
-2. Seite neu laden (F5)
-3. JavaScript-Console prüfen (F12)
-4. API direkt testen: curl http://IP/api/devices
-
-# Mobile-Optimierung
-- Touch-Targets >44px
-- Responsive Breakpoints: 320px, 768px, 1024px
-- Offline-Funktionen für langsame Verbindungen
-```
+**Stromverbrauch**
+- Beacon: 20-40mA (mit USB), <15mA (ohne USB)
+- Scanner: 70-100mA (WiFi + BLE aktiv)
+- USB-Chip: +15-30mA Overhead
 
 ### Hardware-Diagnose
 ```bash
@@ -757,42 +705,4 @@ curl http://IP/api/status | jq '.system.uptime'
 # Scan-Performance
 # Normal: Device-Liste alle 10s aktualisiert
 # Problem: Keine Updates >30s = BLE-Fehler
-```
-
-## 📄 Lizenz & Support
-
-### MIT License
-```
-Copyright (c) 2024 Jan Dressler
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-```
-
-### Support & Community
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/jandressler/esp32-bt-scanner/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/jandressler/esp32-bt-scanner/discussions)
-- 📖 **Documentation**: [Wiki](https://github.com/jandressler/esp32-bt-scanner/wiki)
-- 💬 **Community Support**: (Discord Link Placeholder)
-- 🎯 **Professional Support**: [kontakt@jandressler.de](mailto:kontakt@jandressler.de)
-
-### Contributing Guidelines
-```markdown
-1. Fork the repository
-2. Create feature branch: git checkout -b feature/amazing-feature
-3. Follow coding standards (clang-format provided)
-4. Add tests for new functionality
-5. Update documentation (README, Wiki, Code comments)
-6. Submit Pull Request with detailed description
 ```

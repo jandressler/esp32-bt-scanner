@@ -179,9 +179,9 @@ String WebUI::buildControlsSection() {
         "<button onclick=\"exportDevices()\">📥 Export</button>"
         "<label for=\"import-file\" class=\"file-label\">📤 Import</label>"
         "<input type=\"file\" id=\"import-file\" class=\"file-input\" accept=\".json\" onchange=\"importDevices(this)\">"
-        "<button onclick=\"resetWiFi()\" class=\"danger\">📶 WiFi Reset</button>"
+        "<button onclick=\"resetWiFi()\" class=\"danger\">⚠️ Factory Reset</button>"
         "<button onclick=\"resetBluetooth()\" class=\"danger\">🔵 Bluetooth Reset</button>"
-        "<button onclick=\"resetSystem()\" class=\"danger\">🔄 System Reboot</button>"
+        "<button onclick=\"resetSystem()\" class=\"danger\">🔄 Reboot</button>"
         "</div>"
         "</div>"
     );
@@ -517,7 +517,7 @@ String WebUI::buildActionFunctions() {
         
         // Reset WiFi
         "function resetWiFi(){"
-        "fetch('/api/wifi/reset',{method:'POST'}).then(()=>showNotification('WiFi Reset ausgeführt')).catch(()=>showNotification('WiFi Reset fehlgeschlagen',true));"
+        "fetch('/api/factory-reset',{method:'POST'}).then(()=>showNotification('Factory Reset - Gerät wird offline geschaltet')).catch(()=>showNotification('Factory Reset fehlgeschlagen',true));"
         "}\n"
         
         // Reset Bluetooth
@@ -527,7 +527,7 @@ String WebUI::buildActionFunctions() {
         
         // Reset System
         "function resetSystem(){"
-        "fetch('/api/system/reset',{method:'POST'}).then(()=>showNotification('System wird neu gestartet')).catch(()=>showNotification('System Reset fehlgeschlagen',true));"
+        "fetch('/api/system/reboot',{method:'POST'}).then(()=>showNotification('System wird neu gestartet')).catch(()=>showNotification('Neustart fehlgeschlagen',true));"
         "}\n"
     );
 }

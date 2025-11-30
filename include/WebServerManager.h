@@ -80,8 +80,8 @@ private:
     void handleScanNetworks(AsyncWebServerRequest *request);
     
     // System Control
-    void handleWiFiReset(AsyncWebServerRequest *request);
-    void handleSystemReset(AsyncWebServerRequest *request);
+    void handleFactoryReset(AsyncWebServerRequest *request);
+    void handleSystemReboot(AsyncWebServerRequest *request);
     void handleBluetoothReset(AsyncWebServerRequest *request);
     
     // Mode Setup

@@ -102,12 +102,12 @@ void WebServerManager::setupMainServerRoutes() {
         sendJSONResponse(request, "success", "Test-Logeintrag erstellt");
     });
     
-    server->on("/api/wifi/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
-        handleWiFiReset(request);
+    server->on("/api/factory-reset", HTTP_POST, [this](AsyncWebServerRequest *request){
+        handleFactoryReset(request);
     });
     
-    server->on("/api/system/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
-        handleSystemReset(request);
+    server->on("/api/system/reboot", HTTP_POST, [this](AsyncWebServerRequest *request){
+        handleSystemReboot(request);
     });
 
     // Health check endpoint
@@ -410,20 +410,22 @@ void WebServerManager::handleDevicesAPI(AsyncWebServerRequest *request) {
     request->send(200, "application/json", response);
 }
 
-void WebServerManager::handleWiFiReset(AsyncWebServerRequest *request) {
+void WebServerManager::handleFactoryReset(AsyncWebServerRequest *request) {
     JsonDocument doc;
     doc["status"] = "success";
-    doc["message"] = "WiFi wird zurückgesetzt...";
+    doc["message"] = "Factory Reset wird durchgeführt...";
+    
+    wifiManager.resetWiFiSettings();
     
     String response;
     serializeJson(doc, response);
     request->send(200, "application/json", response);
     
     delay(100);
-    wifiManager.resetWiFiSettings();
+    ESP.restart();
 }
 
-void WebServerManager::handleSystemReset(AsyncWebServerRequest *request) {
+void WebServerManager::handleSystemReboot(AsyncWebServerRequest *request) {
     JsonDocument doc;
     doc["status"] = "success";
     doc["message"] = "System wird neu gestartet...";
