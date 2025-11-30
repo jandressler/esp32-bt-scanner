@@ -53,7 +53,7 @@ Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche
 - **Max. Schaltleistung**: Abhängig vom verwendeten Relais-Modul
 - **Anwendungen**: Türöffner, Garagentore, Beleuchtung, Schütze
 
-![Screenshot Main-Page](./screenshot.png)
+<img src="./screenshot.png" width="90%" alt="Screenshot Main-Page" align="center">
 
 ## 🔧 Installation & Konfiguration
 
@@ -87,7 +87,7 @@ Boot-Button (GPIO9) >4 Sekunden halten
 → Setup-Portal startet als WiFi-AP "ESP32-BT-Scanner"
 → Automatisches Captive Portal öffnet sich
 ```
-![Screenshot Setup-Page auf dem Telefon](./screenshot_setup.png)
+<img src="./screenshot_setup.png" width="30%" alt="Screenshot Setup-Page auf dem Telefon" align="left">
 
 **Im Setup-Portal verfügbar:**
 1. **Beacon-Konfiguration** (bleibt im Beacon-Mode):
