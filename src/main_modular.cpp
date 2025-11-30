@@ -6,7 +6,7 @@
  * 1. BEACON: Stromsparender BLE-Beacon ohne WiFi
  * 2. SCANNER: Bluetooth-Scanner mit Web-Interface und WiFi-Management
  * 
- * Modusauswahl: Boot-Button >3s drücken → Setup-Portal
+ * Modusauswahl: Boot-Button >4s drücken → Setup-Portal
  * Standard bei Erststart: BEACON-Modus
  */
 
@@ -215,7 +215,7 @@ void loop() {
         updateLEDStatus();
     }
     
-    delay(100); // Small pause
+    delay(50); // Small pause for task switching
 }
 
 void initializeWatchdog() {

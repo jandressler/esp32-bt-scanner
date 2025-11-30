@@ -47,9 +47,7 @@ enum DeviceMode {
 
 // =================== WLAN KONFIGURATION ===================
 // WiFiManager wird für initiale Konfiguration verwendet
-// Diese Werte sind nur Fallback-Optionen
-#define WIFI_SSID "mywifi"
-#define WIFI_PASSWORD "mywifipw"
+// Credentials werden in NVS gespeichert
 #define WIFI_TIMEOUT_MS 10000
 #define WIFI_MANAGER_AP_NAME "ESP32-BT-Scanner"
 // Kein Passwort für einfaches Setup!
@@ -57,6 +55,7 @@ enum DeviceMode {
 // WiFiManager Optimierungen für Stabilität
 #define WIFI_AP_CHANNEL 6        // Fester Kanal für Stabilität
 #define WIFI_AP_MAX_CONNECTIONS 4 // Begrenzte Verbindungen
+#define DNS_PORT 53              // DNS Port für Captive Portal
 
 // =================== WATCHDOG KONFIGURATION ===================
 #define WATCHDOG_TIMEOUT_SEC 30   // 30 Sekunden Watchdog-Timeout

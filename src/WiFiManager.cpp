@@ -4,6 +4,7 @@
  */
 
 #include "WiFiManager.h"
+#include <esp_system.h>
 
 WiFiManager::WiFiManager() 
     : isInSecureMode(false), buttonPressStart(0), buttonPressed(false), useStaticIP(false), dnsServer(nullptr) {
@@ -61,6 +62,12 @@ bool WiFiManager::connectToWiFi() {
     if (WiFi.status() == WL_CONNECTED) {
         isInSecureMode = true;
         
+        // Enable WiFi power save for reduced consumption
+        WiFi.setSleep(WIFI_PS_MIN_MODEM);
+        
+        // Reduce CPU frequency to 80MHz
+        setCpuFrequencyMhz(80);
+        
         // Stop DNS Server when connected to WiFi
         if (dnsServer) {
             dnsServer->stop();
@@ -90,11 +97,17 @@ bool WiFiManager::startAccessPoint(const String& apPassword) {
     }
     
     if (success) {
+        // Enable WiFi power save also in AP mode
+        WiFi.setSleep(WIFI_PS_MIN_MODEM);
+        
+        // Reduce CPU frequency to 80MHz
+        setCpuFrequencyMhz(80);
+        
         // Start DNS Server for Captive Portal
         if (!dnsServer) {
             dnsServer = new DNSServer();
         }
-        dnsServer->start(53, "*", WiFi.softAPIP());
+        dnsServer->start(DNS_PORT, "*", WiFi.softAPIP());
         
     }
     

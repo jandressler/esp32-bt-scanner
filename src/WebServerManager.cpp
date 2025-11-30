@@ -244,6 +244,8 @@ void WebServerManager::handleScanNetworks(AsyncWebServerRequest *request) {
     
     JsonArray networks = doc["networks"].to<JsonArray>();
     
+    // Use synchronous scan (async would require state management)
+    // This blocks for ~2-3s but happens rarely (only during setup)
     int n = WiFi.scanNetworks();
     for (int i = 0; i < n; i++) {
         JsonObject network = networks.add<JsonObject>();
@@ -430,7 +432,7 @@ void WebServerManager::handleSystemReset(AsyncWebServerRequest *request) {
     serializeJson(doc, response);
     request->send(200, "application/json", response);
     
-    delay(500);
+    delay(100);
     ESP.restart();
 }
 
@@ -628,7 +630,7 @@ void WebServerManager::handleSetupAP(AsyncWebServerRequest *request, uint8_t *da
         
         if (wifiManager.setAPPassword(password)) {
             sendJSONResponse(request, "success", "AP-Passwort gesetzt, System startet neu...");
-            delay(500);
+            delay(100);
             ESP.restart();
         } else {
             sendJSONResponse(request, "error", "Fehler beim Setzen des AP-Passworts");
@@ -687,7 +689,7 @@ void WebServerManager::startSetupMode() {
         }
         
         request->send(200, "text/plain", "OK");
-        delay(500);
+        delay(100);
         ESP.restart();
     });
     
@@ -784,7 +786,7 @@ void WebServerManager::handleScannerConfigPage(AsyncWebServerRequest *request) {
     request->send(response);
     
     // Restart nach kurzer Verzoegerung
-    delay(2000);
+    delay(100);
     ESP.restart();
 }
 
