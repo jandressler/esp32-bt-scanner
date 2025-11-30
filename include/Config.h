@@ -12,16 +12,47 @@
 
 #include <HardwareSerial.h>
 
+// =================== DEVICE MODE KONFIGURATION ===================
+#define MODE_BUTTON_PIN 9  // Boot-Button (ESP32-C3 DevKitM-1) für Modus-Setup
+#define MODE_BUTTON_DURATION_MS 4000  // 4 Sekunden halten für Setup-Portal
+
+// Device-Betriebsmodi
+enum DeviceMode {
+    MODE_BEACON = 0,    // BLE-Beacon-Modus (default bei Erststart)
+    MODE_SCANNER = 1    // BT-Scanner-Modus mit Web-Interface
+};
+
+// =================== BEACON MODE KONFIGURATION ===================
+#define BEACON_DEFAULT_NAME "BT-beacon"  // Prefix für Beacon-Name (wird mit MAC erweitert)
+#define BEACON_DEFAULT_INTERVAL_MS 800   // Default Sendeintervall in ms
+#define BEACON_MIN_INTERVAL_MS 100       // Minimum 100ms (BLE-Spec: 20ms, aber praktisch)
+#define BEACON_MAX_INTERVAL_MS 10000     // Maximum 10s
+#define BEACON_DEFAULT_TX_POWER 0        // ESP_PWR_LVL_N0 (0dBm) = ~10m Reichweite
+#define BEACON_LED_PULSE_MS 100          // LED-Puls Dauer bei jedem Beacon-Send
+#define BEACON_ACTIVE_LOW 1              // LED invertierte Logik
+
+// DEVELOPMENT: Deaktiviert Light Sleep für einfacheres Flashen
+// Setze auf false für Produktion (20-40mA), true für Entwicklung (~80mA)
+#define DISABLE_SLEEP false
+
+// BLE TX Power Levels (ESP32 specific)
+// ESP_PWR_LVL_N12 = -12dBm (~2m)
+// ESP_PWR_LVL_N9  = -9dBm  (~3m)
+// ESP_PWR_LVL_N6  = -6dBm  (~5m)
+// ESP_PWR_LVL_N3  = -3dBm  (~7m)
+// ESP_PWR_LVL_N0  =  0dBm  (~10m) <- DEFAULT
+// ESP_PWR_LVL_P3  = +3dBm  (~15m)
+// ESP_PWR_LVL_P6  = +6dBm  (~20m)
+// ESP_PWR_LVL_P9  = +9dBm  (~30m)
+
 // =================== WLAN KONFIGURATION ===================
 // WiFiManager wird für initiale Konfiguration verwendet
 // Diese Werte sind nur Fallback-Optionen
-#define WIFI_SSID "threew"
-#define WIFI_PASSWORD "wlan3W$jan112"
+#define WIFI_SSID "mywifi"
+#define WIFI_PASSWORD "mywifipw"
 #define WIFI_TIMEOUT_MS 10000
 #define WIFI_MANAGER_AP_NAME "ESP32-BT-Scanner"
 // Kein Passwort für einfaches Setup!
-#define WIFI_RESET_BUTTON_PIN 9  // Boot-Button (ESP32-C3 DevKitM-1) für WiFi-Reset
-#define WIFI_RESET_BUTTON_DURATION_MS 3000  // 3 Sekunden halten für Reset
 
 // WiFiManager Optimierungen für Stabilität
 #define WIFI_AP_CHANNEL 6        // Fester Kanal für Stabilität

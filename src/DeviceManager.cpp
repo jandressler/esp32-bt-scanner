@@ -167,17 +167,13 @@ void DeviceManager::updateDevice(const char* address, const char* name, int rssi
     }
     
     if (deviceIndex >= 0) {
-        // Update device - nur bessere/neue Informationen übernehmen
+        // Update device data
         
-        // Name nur aktualisieren wenn der neue Name besser ist
+        // Name immer aktualisieren wenn ein neuer Name vorhanden ist
+        // Dies erlaubt Beacon-Namensaktualisierungen in Echtzeit
         if (name && strlen(name) > 0) {
-            // Neuer Name ist vorhanden
-            if (strlen(devices[deviceIndex].name) == 0 || 
-                strcmp(devices[deviceIndex].name, "Unbekanntes Gerät") == 0) {
-                // Alter Name war leer oder "Unbekanntes Gerät" -> neuen Namen übernehmen
-                strncpy(devices[deviceIndex].name, name, sizeof(devices[deviceIndex].name) - 1);
-                devices[deviceIndex].name[sizeof(devices[deviceIndex].name) - 1] = '\0';
-            }
+            strncpy(devices[deviceIndex].name, name, sizeof(devices[deviceIndex].name) - 1);
+            devices[deviceIndex].name[sizeof(devices[deviceIndex].name) - 1] = '\0';
         }
         
         devices[deviceIndex].rssi = rssi;

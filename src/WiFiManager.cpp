@@ -19,7 +19,7 @@ WiFiManager::~WiFiManager() {
 
 bool WiFiManager::begin() {
     // Configure reset button
-    pinMode(WIFI_RESET_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
     
     loadSettings();
     updateSecurityStatus();
@@ -165,7 +165,7 @@ String WiFiManager::getAPIP() const {
 }
 
 void WiFiManager::checkResetButton() {
-    bool currentButtonState = !digitalRead(WIFI_RESET_BUTTON_PIN);  // Pull-up inverted
+    bool currentButtonState = !digitalRead(MODE_BUTTON_PIN);  // Pull-up inverted
     
     if (currentButtonState && !buttonPressed) {
         buttonPressed = true;
@@ -174,7 +174,7 @@ void WiFiManager::checkResetButton() {
         buttonPressed = false;
         unsigned long pressDuration = millis() - buttonPressStart;
         
-        if (pressDuration >= WIFI_RESET_BUTTON_DURATION_MS) {
+        if (pressDuration >= MODE_BUTTON_DURATION_MS) {
             performReset();
         }
     }

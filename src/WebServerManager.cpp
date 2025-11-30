@@ -2,10 +2,12 @@
 #include "Config.h"
 #include "WiFiManager.h"
 #include "WebUI.h"
+#include <BLEDevice.h>
+#include <esp_system.h>
 
 extern WiFiManager wifiManager;
 
-WebServerManager::WebServerManager() : server(nullptr), setupServer(nullptr), deviceManager(nullptr), bluetoothScanner(nullptr), isRunning(false), setupServerStarted(false), isInSecureMode(false) {}
+WebServerManager::WebServerManager() : server(nullptr), setupServer(nullptr), dnsServer(nullptr), deviceManager(nullptr), bluetoothScanner(nullptr), modeManager(nullptr), isRunning(false), setupServerStarted(false), isInSecureMode(false), setupComplete(false) {}
 
 WebServerManager::~WebServerManager() { end(); }
 
@@ -28,6 +30,7 @@ bool WebServerManager::begin(DeviceManager* devMgr, BluetoothScanner* btScanner)
 }
 
 void WebServerManager::end() {
+    if (dnsServer) { dnsServer->stop(); delete dnsServer; dnsServer = nullptr; }
     if (server) { server->end(); delete server; server = nullptr; }
     if (setupServer) { setupServer->end(); delete setupServer; setupServer = nullptr; }
     isRunning = false;
@@ -45,7 +48,7 @@ void WebServerManager::startSetupServer(const String& apPassword) {
 void WebServerManager::setupSetupRoutes() {
     if (!server) return;
     server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
-        request->send(200, "text/html", WebUI::generateSetupHTML());
+        handleModeSetup(request);
     });
     server->on("/api/scan", HTTP_GET, [this](AsyncWebServerRequest *request){
         handleScanNetworks(request);
@@ -69,8 +72,7 @@ void WebServerManager::setupMainServerRoutes() {
     server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
         // Dynamisch je nach aktuellem Sicherheitsstatus Setup- oder Hauptseite liefern
         if (isSetupRequired()) {
-            String setup = WebUI::generateSetupHTML();
-            request->send(200, "text/html", setup);
+            handleModeSetup(request);
             return;
         }
         String page = WebUI::generateMainHTML();
@@ -551,6 +553,12 @@ void WebServerManager::handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *
         
         String ssid = doc["ssid"] | "";
         String password = doc["password"] | "";
+        bool scannerMode = doc["scanner"] | false;
+        
+        // Set scanner mode if requested
+        if (scannerMode && modeManager) {
+            modeManager->setMode(MODE_SCANNER);
+        }
         
         if (ssid.length() == 0) {
             sendJSONResponse(request, "error", "SSID fehlt");
@@ -576,7 +584,6 @@ void WebServerManager::handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *
             sendJSONResponse(request, "success", "WiFi verbunden! IP: " + wifiManager.getLocalIP());
             // Nach erfolgreicher Verbindung Haupt-Routen aktivieren
             this->end();
-            this->setSecureMode(true);
             this->begin(deviceManager, bluetoothScanner);
         } else {
             sendJSONResponse(request, "error", "WiFi Verbindung fehlgeschlagen");
@@ -607,6 +614,12 @@ void WebServerManager::handleSetupAP(AsyncWebServerRequest *request, uint8_t *da
         }
         
         String password = doc["password"] | "";
+        bool scannerMode = doc["scanner"] | false;
+        
+        // Set scanner mode if requested
+        if (scannerMode && modeManager) {
+            modeManager->setMode(MODE_SCANNER);
+        }
         
         if (password.length() < 8) {
             sendJSONResponse(request, "error", "Passwort muss mindestens 8 Zeichen haben");
@@ -623,12 +636,168 @@ void WebServerManager::handleSetupAP(AsyncWebServerRequest *request, uint8_t *da
     }
 }
 
-void WebServerManager::setupAPIRoutes() {
-    // Weitere API-Routen falls benötigt
+// ================== Mode Setup Methods ==================
+
+void WebServerManager::startSetupMode() {
+    setupComplete = false;
+    
+    // Stop existing server if running
+    if (server) {
+        server->end();
+        delete server;
+        server = nullptr;
+    }
+    
+    // Create fresh server for mode setup
+    server = new AsyncWebServer(80);
+    
+    // Start DNS server for captive portal (redirect all DNS requests to our AP IP)
+    if (!dnsServer) {
+        dnsServer = new DNSServer();
+    }
+    dnsServer->start(53, "*", WiFi.softAPIP());
+    
+    // Main setup page - unified mode selection
+    server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
+        handleModeSetup(request);
+    });
+    
+    // Network scan API
+    server->on("/api/scan", HTTP_GET, [this](AsyncWebServerRequest *request){
+        handleScanNetworks(request);
+    });
+    
+    // Beacon configuration via GET with query parameters (simpler for JavaScript fetch)
+    server->on("/setup/beacon", HTTP_POST, [this](AsyncWebServerRequest *request){
+        String name = request->hasParam("name") ? request->getParam("name")->value() : "";
+        int interval = request->hasParam("interval") ? request->getParam("interval")->value().toInt() : 800;
+        int power = request->hasParam("power") ? request->getParam("power")->value().toInt() : 0;
+        
+        // If name is empty or just whitespace, use default "BT-beacon" (triggers MAC suffix)
+        name.trim();
+        if (name.length() == 0) {
+            name = "BT-beacon";
+        }
+        
+        // Save config (will auto-erase NVS if name changed)
+        if (modeManager) {
+            modeManager->setMode(MODE_BEACON);
+            modeManager->setBeaconConfig(name.c_str(), interval, power);
+            setupComplete = true;
+        }
+        
+        request->send(200, "text/plain", "OK");
+        delay(500);
+        ESP.restart();
+    });
+    
+    // WiFi setup with scanner mode flag
+    server->on("/setup/wifi", HTTP_POST, [this](AsyncWebServerRequest *request){
+        sendJSONResponse(request, "success", "WLAN wird verbunden...");
+    }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        handleSetupWiFi(request, data, len, index, total);
+    });
+    
+    // AP setup with scanner mode flag
+    server->on("/setup/ap", HTTP_POST, [this](AsyncWebServerRequest *request){
+        sendJSONResponse(request, "success", "AP wird eingerichtet...");
+    }, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        handleSetupAP(request, data, len, index, total);
+    });
+    
+    // Catch-all for captive portal - redirect all requests to main page
+    server->onNotFound([this](AsyncWebServerRequest *request){
+        handleModeSetup(request);
+    });
+    
+    server->begin();
+    isRunning = true;
 }
 
-void WebServerManager::setupLoxoneRoutes() {
-    // Loxone-spezifische Routen falls benötigt
+void WebServerManager::handleModeSetup(AsyncWebServerRequest *request) {
+    // Get current beacon configuration
+    BeaconConfig currentConfig = modeManager->getBeaconConfig();
+    String currentName = modeManager->getBeaconName();
+    
+    // Use modular WebUI to generate HTML
+    String html = WebUI::generateModeSetupHTML(currentName, currentConfig);
+    
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
 }
 
-// ================== Helper Methods ==================
+void WebServerManager::handleBeaconConfigPage(AsyncWebServerRequest *request) {
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>Beacon Setup</title>";
+    html += "<style>body{font-family:Arial;margin:40px;} input,select{margin:10px 0;padding:8px;width:200px;} button{padding:15px 30px;background:#0066cc;color:white;border:none;border-radius:5px;cursor:pointer;margin-top:20px;}</style>";
+    html += "</head><body>";
+    html += "<h1>Beacon-Modus</h1>";
+    html += "<form method='POST' action='/setup/beacon'>";
+    html += "<label>Name:<br><input type='text' name='name' value='BT-beacon'></label><br>";
+    html += "<label>Intervall (ms):<br><input type='number' name='interval' value='800' min='100' max='10000'></label><br>";
+    html += "<label>TX Power:<br><select name='power'>";
+    html += "<option value='-12'>-12 dBm (2m)</option>";
+    html += "<option value='-9'>-9 dBm (3m)</option>";
+    html += "<option value='-6'>-6 dBm (5m)</option>";
+    html += "<option value='-3'>-3 dBm (7m)</option>";
+    html += "<option value='0' selected>0 dBm (10m)</option>";
+    html += "<option value='3'>3 dBm (15m)</option>";
+    html += "<option value='6'>6 dBm (20m)</option>";
+    html += "<option value='9'>9 dBm (30m)</option>";
+    html += "</select></label><br>";
+    html += "<button type='submit'>Speichern und Starten</button>";
+    html += "</form>";
+    html += "<p><a href='/'>Zurueck</a></p>";
+    html += "</body></html>";
+    
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+}
+
+void WebServerManager::handleScannerConfigPage(AsyncWebServerRequest *request) {
+    if (modeManager) {
+        modeManager->setMode(MODE_SCANNER);
+        setupComplete = true;
+    }
+    
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<meta http-equiv='refresh' content='3;url=/'>";
+    html += "<title>Scanner Setup</title>";
+    html += "<style>body{font-family:Arial;margin:40px;text-align:center;}</style>";
+    html += "</head><body>";
+    html += "<h1>Scanner-Modus aktiviert!</h1>";
+    html += "<p>Geraet startet neu...</p>";
+    html += "<p>Danach WiFi-Setup verfuegbar.</p>";
+    html += "</body></html>";
+    
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+    response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    request->send(response);
+    
+    // Restart nach kurzer Verzoegerung
+    delay(2000);
+    ESP.restart();
+}
+
+void WebServerManager::processDNS() {
+    if (dnsServer) {
+        dnsServer->processNextRequest();
+    }
+}
+
+void WebServerManager::handleModeSelection(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // Not used with simple HTML
+}
+
+void WebServerManager::handleBeaconConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // Not used with simple HTML
+}

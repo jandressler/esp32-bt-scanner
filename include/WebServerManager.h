@@ -13,9 +13,11 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include <DNSServer.h>
 #include "Config.h"
 #include "DeviceManager.h"
 #include "BluetoothScanner.h"
+#include "DeviceModeManager.h"
 
 /**
  * @brief Klasse zur Verwaltung des Webservers
@@ -24,89 +26,72 @@ class WebServerManager {
 private:
     AsyncWebServer* server;
     AsyncWebServer* setupServer;
+    DNSServer* dnsServer;
     DeviceManager* deviceManager;
     BluetoothScanner* bluetoothScanner;
+    DeviceModeManager* modeManager;
     bool isRunning;
     bool setupServerStarted;
     bool isInSecureMode;
+    bool setupComplete;
     
 public:
-    /**
-     * @brief Konstruktor
-     */
     WebServerManager();
-    
-    /**
-     * @brief Destruktor
-     */
     ~WebServerManager();
     
-    /**
-     * @brief Initialisierung des Webservers
-     * @param devMgr Zeiger auf DeviceManager
-     * @param btScanner Zeiger auf BluetoothScanner
-     * @return true wenn erfolgreich
-     */
+    // Initialization
     bool begin(DeviceManager* devMgr, BluetoothScanner* btScanner);
-    
-    /**
-     * @brief Webserver stoppen
-     */
     void end();
     
-    /**
-     * @brief Setup-Server für WiFi-Konfiguration starten
-     * @param apPassword AP-Passwort (leer für offenen AP)
-     */
+    // Setup
     void startSetupServer(const String& apPassword = "");
-    
-    /**
-     * @brief Prüft ob der Server läuft
-     * @return true wenn Server läuft
-     */
+    void startSetupMode();
     bool isServerRunning() const { return isRunning; }
-    
-    /**
-     * @brief Setzt den Sicherheitsmodus
-     * @param secure true für sicheren Modus
-     */
-    void setSecureMode(bool secure) { isInSecureMode = secure; }
-    
-    /**
-     * @brief Prüft ob Setup erforderlich ist
-     * @return true wenn Setup erforderlich
-     */
     bool isSetupRequired() const;
+    bool isSetupComplete() const { return setupComplete; }
+    
+    // Configuration
+    void setModeManager(DeviceModeManager* mgr) { modeManager = mgr; }
+    
+    // DNS Server handling for captive portal
+    void processDNS();
     
 private:
     void setupMainServerRoutes();
-    void setupAPIRoutes();
-    void setupLoxoneRoutes();
     void setupSetupRoutes();
+    
+    // API Handlers
     void handleStatusAPI(AsyncWebServerRequest *request);
     void handleDevicesAPI(AsyncWebServerRequest *request);
-    void handleAddKnownAPI(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
-    void handleRemoveKnownAPI(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     
-    // Device Management Handlers
+    // Device Management
     void handleSetKnownDevice(AsyncWebServerRequest *request);
     void handleStartScan(AsyncWebServerRequest *request);
     void handleClearDevices(AsyncWebServerRequest *request);
     
-    // Export/Import Handlers
+    // Export/Import
     void handleExportDevicesFile(AsyncWebServerRequest *request);
     void handleImportDevicesFile(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     
-    // Setup-spezifische Handler
+    // Setup WiFi
     void handleSetupRoot(AsyncWebServerRequest *request);
     void handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     void handleSetupAP(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     void handleScanNetworks(AsyncWebServerRequest *request);
+    
+    // System Control
     void handleWiFiReset(AsyncWebServerRequest *request);
     void handleSystemReset(AsyncWebServerRequest *request);
     void handleBluetoothReset(AsyncWebServerRequest *request);
     
-    // Hilfs-Methoden
+    // Mode Setup
+    void handleModeSetup(AsyncWebServerRequest *request);
+    void handleBeaconConfigPage(AsyncWebServerRequest *request);
+    void handleScannerConfigPage(AsyncWebServerRequest *request);
+    void handleModeSelection(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    void handleBeaconConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    
+    // Helpers
     String formatRelativeTime(unsigned long seconds);
     void updateAllDeviceStatus();
     void sendJSONResponse(AsyncWebServerRequest *request, const String& status, const String& message = "");

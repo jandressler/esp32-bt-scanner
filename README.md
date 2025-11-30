@@ -9,7 +9,17 @@
 Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche und einfachen HTTP-Integrationen (z.B. Loxone). Speicher-statisch, ohne serielle Laufzeit-Logs.
 
 ## 🎯 Hauptfunktionen
-### 🌐 Modernes Web-Interface
+
+### 📡 Dual-Mode Operation
+- **Beacon Mode (Default)**: Stromsparender BLE-Advertiser, ~20-40mA, kein WiFi
+  - Bei Erstflash: Startet automatisch als `BT-beacon_<MAC>` (eindeutiger Name)
+  - Wechsel zu Scanner: Boot-Button (GPIO9) >4s halten → Setup-Portal
+- **Scanner Mode**: BLE-Geräte scannen, Web-Interface, Relais-Steuerung
+  - Aktivierung nur via Setup-Portal nach Boot-Button >4s
+  - WiFi erforderlich (Captive Portal oder Station Mode)
+- **Mode-Switch**: Persistent in NVS gespeichert, überlebt Neustarts
+
+### 🌐 Modernes Web-Interface (Scanner Mode)
 - **Responsive Design**: Mobile-First Ansatz, Touch-optimiert
 - **Aktualisierung**: On-Demand (Button/Seitenreload), kein Auto-Polling
 - **Moderne Oberfläche**: Schlanke UI mit klarer Typografie
@@ -21,17 +31,23 @@ Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche
 - **Bekannte Geräte**: Bis zu 200 persistente Geräte mit Kommentaren (32 Zeichen)
 - **RSSI-Schwellenwerte**: Individuell pro Gerät einstellbar (-60 bis -90 dBm)
 - **Timeout**: 2 Minuten ohne Signal = automatisch inaktiv
-### 💾 Backup & Restore
+### 💾 Backup & Restore (Scanner Mode)
 - **JSON-Export**: Download der bekannten Geräte
 - **Import**: Browser-native File-API
 - **Konfliktfrei**: Bestehende Geräte werden aktualisiert
 - **Validierung**: Basis-JSON-Parsing ohne Schema-Validierung
 - **Hardware WiFi-Reset**: Boot-Button (GPIO9) 3s drücken → WiFi-Credentials löschen
 
+### 📡 Beacon Mode Features
+- **Pure BLE Advertising**: Minimalistischer Advertiser ohne WiFi/Web-Interface
+- **Power Optimized**: 20-40mA Stromverbrauch (mit USB-Serial), <15mA ohne USB
+- **Light Sleep**: Explizites `esp_light_sleep_start()` zwischen Advertising-Zyklen
+- **Duty-Cycle**: Advertising nur 100ms pro Intervall, Rest Sleep
+- **LED Feedback**: Blinkt synchron mit Advertising (100ms)
+- **Konfigurierbar**: Beacon-Name und Intervall über Web-Interface (im Scanner-Mode)
+- **Persistent**: Einstellungen in NVS gespeichert, überleben Neustarts
 
-
-
-### Relais-Modul Kompatibilität
+### Relais-Modul Kompatibilität (Scanner Mode)
 - **3.3V Logic-Level**: Direkt ESP32-C3 kompatibel
 - **Optokoppler-Isolation**: Empfohlen für 24V-Industrie-Anwendungen
 - **Max. Schaltleistung**: Abhängig vom verwendeten Relais-Modul
@@ -48,34 +64,107 @@ pip install platformio
 # https://platformio.org/install/ide?install=vscode
 ```
 
-### 1. WiFi-Setup via Captive Portal ⭐ **ZERO CONFIG**
+### 0. Mode-Auswahl & Ersteinrichtung
 
-**Komplett automatisches Setup - KEINE Code-Änderungen nötig!**
+**⚠️ WICHTIG: Bei frischem Flash startet das Gerät als Beacon!**
+
+Das System unterstützt zwei Betriebsmodi:
+
+**Beacon Mode (Werkseinstellung):**
+- **Erststart**: Gerät advertised automatisch als `BT-beacon_<MAC-Suffix>`
+  - Beispiel: `BT-beacon_193D` (letzte 4 Zeichen der MAC-Adresse)
+  - Eindeutiger Name, kein manuelles Setup nötig
+- **Stromverbrauch**: 20-40mA (mit USB), <15mA (ohne USB)
+- **Keine Konfiguration nötig**: Läuft sofort nach Flash
+- **LED**: Blinkt alle 700ms für 100ms (Standard-Intervall)
+
+**Setup-Portal aufrufen (für alle Konfigurationen):**
+```
+Boot-Button (GPIO9) >4 Sekunden halten
+→ LED blinkt schnell (20x, 100ms/100ms)
+→ Setup-Portal startet als WiFi-AP "ESP32-BT-Scanner"
+→ Automatisches Captive Portal öffnet sich
+```
+
+**Im Setup-Portal verfügbar:**
+1. **Beacon-Konfiguration** (bleibt im Beacon-Mode):
+   - Beacon-Name ändern (z.B. "Wohnzimmer-Beacon")
+   - Advertising-Intervall: 500-2000ms
+   - Speichern → Neustart als konfigurierter Beacon
+
+2. **Scanner Mode aktivieren**:
+   - WiFi-Zugangsdaten eingeben (Station Mode)
+   - ODER als Access Point betreiben
+   - Speichern → Neustart als Scanner mit vollem Feature-Set
+
+**Scanner Mode:**
+- **Aktivierung**: Nur über Setup-Portal (Boot-Button >3s)
+- **Features**: BLE-Scan, Web-Interface, Relais-Steuerung, API
+- **Stromverbrauch**: ~80-120mA (mit WiFi)
+- **WiFi erforderlich**: Station oder AP Mode
+
+**Zusammenfassung:**
+```
+Frisches Gerät → Beacon "BT-beacon_<MAC>"
+Boot-Button >4s → Setup-Portal
+  ├─ Beacon-Name ändern → Beacon mit neuem Namen
+  └─ Scanner aktivieren → Scanner mit WiFi
+```
+
+### 1. Erstflash & Inbetriebnahme
 
 ```mermaid
 graph TD
-    A[ESP32 hochladen] --> B[Access Point startet]
-    B --> C[Smartphone zu ESP32-BT-Scanner verbinden]
-    C --> D[Captive Portal öffnet automatisch]
-    D --> E[WLAN auswählen + Passwort]
-    E --> F[Save klicken]
-    F --> G[ESP32 neustart + WLAN-Verbindung]
-    G --> H[Web-Interface unter IP verfügbar]
+    A[Firmware flashen] --> B[Beacon startet: BT-beacon_MAC]
+    B --> C{Mode ändern?}
+    C -->|Nein| D[Läuft als Beacon 20-40mA]
+    C -->|Ja| E[Boot-Button >3s]
+    E --> F[Setup-Portal: ESP32-BT-Scanner]
+    F --> G{Welcher Mode?}
+    G -->|Beacon konfigurieren| H[Name/Intervall ändern → Beacon]
+    G -->|Scanner aktivieren| I[WiFi einrichten → Scanner]
 ```
 
-**Schritt-für-Schritt:**
-1. **Firmware flashen**: `platformio run --target upload`
-2. **WLAN öffnen**: ESP32 startet als `ESP32-BT-Scanner` (OHNE Passwort)
-3. **Verbindung**: Smartphone/Laptop zum Access Point verbinden
-4. **Portal öffnet automatisch**: 
-   - **Automatisch**: Bei den meisten Geräten öffnet sich das Setup-Portal automatisch
-   - **Manuell**: Falls nicht, Browser öffnen und `http://192.168.4.1` eingeben
-5. **Konfiguration**: WLAN auswählen, Passwort eingeben, "Save"
-6. **Fertig**: ESP32 startet neu, Web-Interface unter neuer IP verfügbar
+**Schritt 1: Firmware flashen**
+```bash
+platformio run --target upload
+```
+→ **Gerät startet automatisch als Beacon** mit Name `BT-beacon_<MAC-Suffix>`
+→ LED blinkt alle 700ms für 100ms
+→ Kein Setup nötig, läuft sofort!
 
-**💡 Tipp**: Wenn das Captive Portal nicht automatisch öffnet, einfach im Browser `192.168.4.1` aufrufen.
+**Schritt 2: Mode/Konfiguration ändern (optional)**
 
-**WiFi-Reset**: Boot-Button (GPIO9) 3 Sekunden drücken → Neukonfiguration
+Nur wenn Scanner-Mode gewünscht ODER Beacon-Name anpassen:
+
+1. **Boot-Button (GPIO9) drücken & halten**:
+   - Button mindestens 4 Sekunden halten
+   - LED blinkt schnell (20x, 100ms/100ms) = Setup-Portal startet
+   - Loslassen nach schnellem Blinken
+
+2. **Setup-Portal verbindet automatisch**:
+   - ESP32 startet Access Point: `ESP32-BT-Scanner` (OHNE Passwort)
+   - Smartphone/Laptop verbinden
+   - Captive Portal öffnet automatisch (oder manuell `http://192.168.4.1`)
+
+3. **Im Setup-Portal**:
+   
+   **Option A - Beacon-Name ändern**:
+   - Tab "Beacon" öffnen
+   - Name eingeben (z.B. "Keller-Beacon")
+   - Intervall anpassen (optional)
+   - "Speichern" → Neustart als Beacon mit neuem Namen
+   
+   **Option B - Scanner aktivieren**:
+   - Tab "WiFi" oder "Access Point" öffnen
+   - WiFi-Credentials eingeben ODER AP-Mode wählen
+   - "Speichern" → Neustart als Scanner
+   - Web-Interface unter angezeigter IP verfügbar
+
+**💡 Wichtig**:
+- **Beacon-Mode**: Braucht KEIN Setup-Portal, läuft sofort nach Flash
+- **Scanner-Mode**: Erfordert Boot-Button >4s + WiFi-Konfiguration
+- **Setup-Portal**: Immer über Boot-Button >4s erreichbar (beide Modi)
 
 ### 2. Kompilierung & Upload
 
@@ -96,6 +185,7 @@ platformio device monitor --baud 115200
 
 ### 3. Erste Einrichtung & Konfiguration
 
+**Scanner Mode Setup:**
 ```mermaid
 graph LR
     A[Web-Interface öffnen] --> B[BLE-Scan läuft automatisch]
@@ -111,6 +201,14 @@ graph LR
 4. **RSSI-Tuning**: Schwellenwerte pro Gerät einstellen (-60 bis -90 dBm)
 5. **Backup**: Export erstellen für Datensicherung
 6. **Produktiv**: System läuft 24/7 mit automatischem Monitoring
+
+**Beacon Mode Setup (ab Werk):**
+1. **Erstflash**: Gerät läuft automatisch als Beacon
+2. **Standard-Name**: `BT-beacon_<MAC>` (eindeutig, z.B. "BT-beacon_193D")
+3. **Standard-Intervall**: 800ms
+4. **Name ändern**: Boot-Button >4s → Setup-Portal → Beacon-Tab → Name + Intervall
+5. **Betrieb**: LED blinkt synchron mit Advertising (100ms aktiv, Rest Sleep)
+6. **Zu Scanner wechseln**: Boot-Button >4s → Setup-Portal → Scanner aktivieren
 
 ## 🌐 Web-Interface Features
 
@@ -479,6 +577,8 @@ CPU-Performance:
 ```
 
 ### Timing-Charakteristiken
+
+**Scanner Mode:**
 ```yaml
 Scan-Zyklus: 10s (2s scan + 8s pause)
 API-Response: <50ms (typ. 20-30ms)
@@ -488,7 +588,20 @@ System-Startup: <5s (WiFi + BLE init)
 Recovery-Time: ~3s (nach Watchdog-Reset)
 ```
 
+**Beacon Mode:**
+```yaml
+Advertising-Zyklus: Konfigurierbar (100-10000ms, Standard 800ms)
+Active-Time: 100ms (Advertising + LED)
+Sleep-Time: (Intervall - 100ms)
+Light-Sleep-Entry: <5ms
+Light-Sleep-Wakeup: <5ms
+System-Startup: <2s (1s LED-Blink, dann BLE init)
+Power-Consumption: 20-40mA (mit USB), <15mA (ohne USB)
+```
+
 ### Speicher-Management
+
+**Scanner Mode:**
 ```cpp
 // Device Arrays (statisch alloziert)
 SafeDevice devices[MAX_DEVICES];              // 32 * 280 bytes = 8.9KB
@@ -503,9 +616,20 @@ OutputLogEntry outputLog[MAX_OUTPUT_LOG_ENTRIES]; // 30 * 120 bytes = 3.6KB
 // Bluetooth Stack: ~25KB
 ```
 
+**Beacon Mode:**
+```cpp
+// Minimal Memory Footprint
+BLEAdvertising* advertising;                  // ~200 bytes
+BeaconConfig config (NVS);                    // ~50 bytes
+Bluetooth Stack (BLE only):                   // ~15KB
+
+// Total Memory: ~16KB (vs ~83KB Scanner Mode)
+// RAM Savings: ~67KB freed (no WiFi, no Web-Server, no Device-Arrays)
+```
+
 ## 🔍 Troubleshooting & Debug
 
-### WiFi-Probleme
+### WiFi-Probleme (Scanner Mode)
 ```bash
 # Symptom: Captive Portal nicht erreichbar
 1. ESP32 Reset-Button drücken
@@ -515,7 +639,7 @@ OutputLogEntry outputLog[MAX_OUTPUT_LOG_ENTRIES]; // 30 * 120 bytes = 3.6KB
 5. 2.4GHz Band aktiviert? (nicht 5GHz)
 
 # Symptom: WLAN-Verbindung instabil
-1. Boot-Button (GPIO9) 3s drücken → WiFi-Reset
+1. Boot-Button (GPIO9) 4s drücken → Setup-Portal
 2. Captive Portal erneut durchlaufen
 3. Router-Firmware aktualisieren
 4. Kanal-Interferenzen prüfen (Kanal 1, 6, 11 bevorzugt)
@@ -523,6 +647,32 @@ OutputLogEntry outputLog[MAX_OUTPUT_LOG_ENTRIES]; // 30 * 120 bytes = 3.6KB
 # Debug via Serial Monitor
 platformio device monitor --baud 115200
 # Hinweis: Standard-Code erzeugt keine Serial-Ausgaben; Diagnose über /api/status und /health
+```
+
+### Beacon Mode Probleme
+```bash
+# Symptom: LED blinkt nicht
+1. Beacon läuft? Bei Start: 1x langes Blinken (1s)
+2. Intervall zu lang? Standard: 800ms
+3. GPIO8 verkabelt? LED intern auf ESP32-C3
+
+# Symptom: BLE nicht sichtbar
+1. BLE-Scanner-App: nRF Connect, LightBlue
+2. Beacon-Name prüfen: Standard "BT-beacon_<MAC>"
+3. Advertising-Intervall: 100-10000ms (je länger, desto seltener sichtbar)
+4. Zurück zu Scanner-Mode: Boot-Button >4s → Setup-Portal → Scanner aktivieren
+
+# Symptom: Stromverbrauch zu hoch (>50mA)
+1. USB-Serial-Chip: ~15-30mA Overhead (normal)
+2. Ohne USB messen: <15mA erwartet
+3. Intervall verkürzen = höherer Verbrauch (mehr Advertising)
+4. Light-Sleep aktiv? Code-Check: esp_light_sleep_start() aufgerufen
+
+# Mode zurücksetzen
+1. Boot-Button (GPIO9) 4s halten → Setup-Portal
+2. Captive Portal verbinden (ESP32-BT-Scanner)
+3. Setup-Seite → Scanner oder Beacon Mode wählen
+4. Konfiguration neu vornehmen
 ```
 
 ### Bluetooth-Probleme
@@ -566,10 +716,22 @@ platformio device monitor --baud 115200
 ### Hardware-Diagnose
 ```bash
 # LED-Status interpretieren
-Dauerhaft AUS:   Kein bekanntes Gerät in Reichweite
-Dauerhaft AN:    Mindestens ein bekanntes Gerät nah genug (Threshold erfüllt)
-Blinkt schnell:  WiFi-Verbindungsaufbau
-Blinkt 3x:       WiFi-Reset erkannt
+
+Beacon Mode:
+1 langes Blinken (1s): Beacon-Start erfolgreich
+Kurzer Blink (100ms):  Advertising-Zyklus aktiv (alle X ms, Standard 800ms)
+
+Boot-Button Sequenz:
+Button >4s halten:     Nach 4s schnelles Blinken (20x, 100ms/100ms)
+                       Setup-Portal startet danach
+
+Setup Mode:
+Sehr schnelles Blinken: Setup-Portal aktiv (100ms/100ms)
+                        WiFi-AP "ESP32-BT-Scanner" verfügbar
+
+Scanner Mode:
+Dauerhaft AN:          Mindestens ein bekanntes Gerät in Reichweite (Threshold erfüllt)
+Dauerhaft AUS:         Kein bekanntes Gerät in Reichweite
 
 # GPIO-Testing via API
 curl -X POST http://IP/api/output-log/test

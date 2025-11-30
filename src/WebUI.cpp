@@ -25,15 +25,22 @@ String WebUI::generateMainHTML() {
     return html;
 }
 
-String WebUI::generateSetupHTML() {
+String WebUI::generateModeSetupHTML(const String& beaconName, const BeaconConfig& beaconConfig) {
     String html;
-    html.reserve(4096);
+    html.reserve(8192);
     
     html += buildHTMLHeader();
-    html += buildSetupStyles();
+    html += buildModeSetupStyles();
     html += "</head><body>";
-    html += buildSetupStructure();
-    html += buildSetupScript();
+    html += "<div class='container'>";
+    html += buildModeSetupHeader();
+    html += buildTabButtons();
+    html += buildBeaconTab(beaconName, beaconConfig);
+    html += buildWiFiTab();
+    html += buildAPTab();
+    html += "<div id='message'></div>";
+    html += "</div>";
+    html += buildModeSetupScript();
     html += buildHTMLFooter();
     
     return html;
@@ -539,26 +546,26 @@ String WebUI::buildInitFunction() {
 }
 
 // ============================================================================
-// SETUP HTML - Styles
+// MODE SETUP HTML - Styles (Beacon/WiFi/AP)
 // ============================================================================
 
-String WebUI::buildSetupStyles() {
+String WebUI::buildModeSetupStyles() {
     return String(
         "<style>"
         "body{font-family:Arial,sans-serif;margin:20px;background:#f5f5f5;}"
-        ".container{max-width:500px;margin:0 auto;background:white;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}"
+        ".container{max-width:600px;margin:0 auto;background:white;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}"
         "h1{text-align:center;color:#333;margin-bottom:30px;}"
+        ".tab-buttons{display:flex;margin-bottom:20px;gap:5px;}"
+        ".tab-button{flex:1;padding:12px;background:#e9ecef;border:none;cursor:pointer;border-radius:5px;font-weight:bold;}"
+        ".tab-button.active{background:#007bff;color:white;}"
+        ".tab{display:none;}"
+        ".tab.active{display:block;}"
         ".form-group{margin-bottom:20px;}"
         "label{display:block;margin-bottom:5px;font-weight:bold;}"
         "input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;box-sizing:border-box;}"
-        "button{width:100%;padding:12px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;}"
+        "button{width:100%;padding:12px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-top:10px;}"
         "button:hover{background:#0056b3;}"
-        ".tab{display:none;}"
-        ".tab.active{display:block;}"
-        ".tab-buttons{display:flex;margin-bottom:20px;}"
-        ".tab-button{flex:1;padding:10px;background:#e9ecef;border:none;cursor:pointer;}"
-        ".tab-button.active{background:#007bff;color:white;}"
-        ".networks{max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:5px;}"
+        ".networks{max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:5px;margin-bottom:10px;}"
         ".network{padding:10px;border-bottom:1px solid #eee;cursor:pointer;}"
         ".network:hover{background:#f8f9fa;}"
         ".network:last-child{border-bottom:none;}"
@@ -570,71 +577,121 @@ String WebUI::buildSetupStyles() {
 }
 
 // ============================================================================
-// SETUP HTML - Structure
+// MODE SETUP HTML - Header
 // ============================================================================
 
-String WebUI::buildSetupStructure() {
+String WebUI::buildModeSetupHeader() {
+    return "<h1>ESP32 BT Scanner Setup</h1>";
+}
+
+// ============================================================================
+// MODE SETUP HTML - Tab Buttons
+// ============================================================================
+
+String WebUI::buildTabButtons() {
     return String(
-        "<div class=\"container\">"
-        "<h1>🔧 ESP32-C3 Setup</h1>"
-        "<div class=\"tab-buttons\">"
-        "<button class=\"tab-button active\" onclick=\"showTab('wifi')\">WLAN verbinden</button>"
-        "<button class=\"tab-button\" onclick=\"showTab('ap')\">Sicherer AP</button>"
-        "</div>"
-        "<div id=\"wifi-tab\" class=\"tab active\">"
-        "<div class=\"form-group\">"
-        "<label>Verfügbare Netzwerke:</label>"
-        "<div id=\"networks\" class=\"networks\">Lade Netzwerke...</div>"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label for=\"wifi-ssid\">SSID:</label>"
-        "<input type=\"text\" id=\"wifi-ssid\" placeholder=\"Netzwerkname\">"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label for=\"wifi-password\">Passwort:</label>"
-        "<input type=\"password\" id=\"wifi-password\" placeholder=\"WLAN-Passwort\">"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label><input type=\"checkbox\" id=\"use-static-ip\" onchange=\"toggleStaticIP()\"> Statische IP verwenden</label>"
-        "</div>"
-        "<div id=\"static-ip-fields\" style=\"display:none;\">"
-        "<div class=\"form-group\">"
-        "<label for=\"static-ip\">IP-Adresse:</label>"
-        "<input type=\"text\" id=\"static-ip\" placeholder=\"192.168.1.100\">"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label for=\"gateway\">Gateway:</label>"
-        "<input type=\"text\" id=\"gateway\" placeholder=\"192.168.1.1\">"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label for=\"subnet\">Subnetzmaske:</label>"
-        "<input type=\"text\" id=\"subnet\" placeholder=\"255.255.255.0\" value=\"255.255.255.0\">"
-        "</div>"
-        "<div class=\"form-group\">"
-        "<label for=\"dns\">DNS Server:</label>"
-        "<input type=\"text\" id=\"dns\" placeholder=\"8.8.8.8\" value=\"8.8.8.8\">"
-        "</div>"
-        "</div>"
-        "<button onclick=\"connectWiFi()\">Verbinden</button>"
-        "</div>"
-        "<div id=\"ap-tab\" class=\"tab\">"
-        "<p>Erstelle einen sicheren Access Point für den ESP32.</p>"
-        "<div class=\"form-group\">"
-        "<label for=\"ap-password\">AP-Passwort:</label>"
-        "<input type=\"password\" id=\"ap-password\" placeholder=\"Mindestens 8 Zeichen\">"
-        "</div>"
-        "<button onclick=\"setupAP()\">AP erstellen</button>"
-        "</div>"
-        "<div id=\"message\"></div>"
+        "<div class='tab-buttons'>"
+        "<button class='tab-button active' onclick='showTab(\"beacon\")'>Beacon</button>"
+        "<button class='tab-button' onclick='showTab(\"wifi\")'>Scanner + WiFi</button>"
+        "<button class='tab-button' onclick='showTab(\"ap\")'>Scanner + AP</button>"
         "</div>"
     );
 }
 
 // ============================================================================
-// SETUP HTML - Script
+// MODE SETUP HTML - Beacon Tab
 // ============================================================================
 
-String WebUI::buildSetupScript() {
+String WebUI::buildBeaconTab(const String& beaconName, const BeaconConfig& beaconConfig) {
+    // Determine display information
+    bool isDefault = (beaconName == "BT-beacon" || beaconName.length() == 0);
+    
+    // Get BLE MAC for suffix
+    uint8_t bleMac[6];
+    esp_read_mac(bleMac, ESP_MAC_BT);
+    char bleMacSuffix[5];
+    snprintf(bleMacSuffix, sizeof(bleMacSuffix), "%02X%02X", bleMac[4], bleMac[5]);
+    
+    String displayHint = isDefault ? String("BT-beacon_") + String(bleMacSuffix) : beaconName;
+    String fieldValue = isDefault ? "" : beaconName;
+    
+    String html = "<div id='beacon-tab' class='tab active'>";
+    html += "<h3>Beacon-Modus</h3>";
+    html += "<p>BLE-Beacon ohne WiFi (stromsparend)</p>";
+    html += "<p style='color:#666;font-size:0.9em;'>Aktuell gespeichert: " + displayHint + "</p>";
+    html += "<p style='color:#ff9500;font-size:0.9em;font-weight:bold;'>⚠️ Namensänderung: Stromlos-Neustart erforderlich!</p>";
+    html += "<p style='color:#999;font-size:0.85em;'>Leer lassen = Auto-Name (BT-beacon_MAC)</p>";
+    html += "<form onsubmit='return setupBeacon(event)'>";
+    html += "<div class='form-group'><label>Name (optional):</label><input type='text' id='beacon-name' value='" + fieldValue + "' maxlength='20' placeholder='Leer = BT-beacon_MAC'></div>";
+    html += "<div class='form-group'><label>Intervall (ms):</label><input type='number' id='beacon-interval' value='" + String(beaconConfig.intervalMs) + "' min='100' max='10000'></div>";
+    html += "<div class='form-group'><label>TX Power:</label><select id='beacon-power'>";
+    
+    // TX Power options
+    html += String("<option value='-12'") + (beaconConfig.txPower == -12 ? " selected" : "") + ">-12 dBm (2m)</option>";
+    html += String("<option value='-9'") + (beaconConfig.txPower == -9 ? " selected" : "") + ">-9 dBm (3m)</option>";
+    html += String("<option value='-6'") + (beaconConfig.txPower == -6 ? " selected" : "") + ">-6 dBm (5m)</option>";
+    html += String("<option value='-3'") + (beaconConfig.txPower == -3 ? " selected" : "") + ">-3 dBm (7m)</option>";
+    html += String("<option value='0'") + (beaconConfig.txPower == 0 ? " selected" : "") + ">0 dBm (10m)</option>";
+    html += String("<option value='3'") + (beaconConfig.txPower == 3 ? " selected" : "") + ">3 dBm (15m)</option>";
+    html += String("<option value='6'") + (beaconConfig.txPower == 6 ? " selected" : "") + ">6 dBm (20m)</option>";
+    html += String("<option value='9'") + (beaconConfig.txPower == 9 ? " selected" : "") + ">9 dBm (30m)</option>";
+    
+    html += "</select></div>";
+    html += "<button type='submit'>Beacon starten</button>";
+    html += "</form>";
+    html += "</div>";
+    
+    return html;
+}
+
+// ============================================================================
+// MODE SETUP HTML - WiFi Tab
+// ============================================================================
+
+String WebUI::buildWiFiTab() {
+    return String(
+        "<div id='wifi-tab' class='tab'>"
+        "<h3>Scanner + WLAN</h3>"
+        "<p>Mit bestehendem WLAN verbinden</p>"
+        "<div class='form-group'><label>Netzwerke:</label><div id='networks' class='networks'>Lade...</div></div>"
+        "<form onsubmit='return setupWiFi(event)'>"
+        "<div class='form-group'><label>SSID:</label><input type='text' id='wifi-ssid'></div>"
+        "<div class='form-group'><label>Passwort:</label><input type='password' id='wifi-password'></div>"
+        "<div class='form-group'><label><input type='checkbox' id='use-static-ip' onchange='toggleStaticIP()'> Statische IP</label></div>"
+        "<div id='static-ip-fields' style='display:none;'>"
+        "<div class='form-group'><label>IP:</label><input type='text' id='static-ip' placeholder='192.168.1.100'></div>"
+        "<div class='form-group'><label>Gateway:</label><input type='text' id='gateway' placeholder='192.168.1.1'></div>"
+        "<div class='form-group'><label>Subnet:</label><input type='text' id='subnet' value='255.255.255.0'></div>"
+        "<div class='form-group'><label>DNS:</label><input type='text' id='dns' value='8.8.8.8'></div>"
+        "</div>"
+        "<button type='submit'>Verbinden</button>"
+        "</form>"
+        "</div>"
+    );
+}
+
+// ============================================================================
+// MODE SETUP HTML - AP Tab
+// ============================================================================
+
+String WebUI::buildAPTab() {
+    return String(
+        "<div id='ap-tab' class='tab'>"
+        "<h3>Scanner + Sicherer AP</h3>"
+        "<p>Eigenen Access Point erstellen</p>"
+        "<form onsubmit='return setupAP(event)'>"
+        "<div class='form-group'><label>AP-Passwort:</label><input type='password' id='ap-password' placeholder='Mind. 8 Zeichen' minlength='8'></div>"
+        "<button type='submit'>AP erstellen</button>"
+        "</form>"
+        "</div>"
+    );
+}
+
+// ============================================================================
+// MODE SETUP HTML - Script
+// ============================================================================
+
+String WebUI::buildModeSetupScript() {
     return String(
         "<script>"
         "function showTab(tab){"
@@ -642,61 +699,86 @@ String WebUI::buildSetupScript() {
         "document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active'));"
         "document.getElementById(tab+'-tab').classList.add('active');"
         "event.target.classList.add('active');"
+        "if(tab==='wifi')loadNetworks();"
         "}"
-        "function showMessage(text,isError=false){"
+        "function showMessage(text,isError){"
         "const msg=document.getElementById('message');"
         "msg.textContent=text;"
         "msg.className=isError?'error':'success';"
         "msg.style.display='block';"
-        "setTimeout(()=>msg.style.display='none',5000);"
+        "setTimeout(()=>msg.style.display='none',8000);"
         "}"
         "function toggleStaticIP(){"
-        "const checked=document.getElementById('use-static-ip').checked;"
-        "document.getElementById('static-ip-fields').style.display=checked?'block':'none';"
+        "document.getElementById('static-ip-fields').style.display="
+        "document.getElementById('use-static-ip').checked?'block':'none';"
         "}"
-        "function connectWiFi(){"
+        "function setupBeacon(e){"
+        "e.preventDefault();"
+        "const name=document.getElementById('beacon-name').value;"
+        "const interval=document.getElementById('beacon-interval').value;"
+        "const power=document.getElementById('beacon-power').value;"
+        "const params=new URLSearchParams({name:name,interval:interval,power:power});"
+        "fetch('/setup/beacon?'+params,{method:'POST'})"
+        ".then(()=>{"
+        "showMessage('Beacon wird gestartet...');"
+        "setTimeout(()=>location.reload(),3000);"
+        "})"
+        ".catch(()=>{"
+        "showMessage('Beacon wird gestartet...');"
+        "setTimeout(()=>location.reload(),3000);"
+        "});"
+        "return false;"
+        "}"
+        "function setupWiFi(e){"
+        "e.preventDefault();"
         "const ssid=document.getElementById('wifi-ssid').value;"
         "const password=document.getElementById('wifi-password').value;"
-        "if(!ssid){showMessage('Bitte SSID eingeben',true);return;}"
-        "const useStatic=document.getElementById('use-static-ip').checked;"
-        "let body={ssid:ssid,password:password};"
-        "if(useStatic){"
-        "const ip=document.getElementById('static-ip').value;"
-        "const gw=document.getElementById('gateway').value;"
-        "const sn=document.getElementById('subnet').value;"
-        "const dns=document.getElementById('dns').value;"
-        "if(!ip||!gw){showMessage('Bitte IP und Gateway eingeben',true);return;}"
-        "body.static_ip=ip;body.gateway=gw;body.subnet=sn;body.dns=dns;"
+        "if(!ssid){showMessage('SSID eingeben',true);return false;}"
+        "let body={ssid:ssid,password:password,scanner:true};"
+        "if(document.getElementById('use-static-ip').checked){"
+        "body.static_ip=document.getElementById('static-ip').value;"
+        "body.gateway=document.getElementById('gateway').value;"
+        "body.subnet=document.getElementById('subnet').value;"
+        "body.dns=document.getElementById('dns').value;"
         "}"
         "fetch('/setup/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})"
         ".then(r=>r.json()).then(d=>{"
-        "showMessage(d.message,d.status!=='success');"
-        "if(d.status==='success'){setTimeout(()=>{showMessage('Seite wird neu geladen...');setTimeout(()=>window.location.reload(),2000);},3000);}"
-        "}).catch(error=>{setTimeout(()=>{showMessage('Verbindung wird aufgebaut, Seite wird neu geladen...');setTimeout(()=>window.location.reload(),3000);},2000);});"
+        "showMessage(d.message||'Verbinde...',d.status!=='success');"
+        "if(d.status==='success')setTimeout(()=>location.reload(),5000);"
+        "}).catch(()=>{"
+        "showMessage('Verbinde mit WLAN...');"
+        "setTimeout(()=>location.reload(),5000);"
+        "});"
+        "return false;"
         "}"
-        "function setupAP(){"
+        "function setupAP(e){"
+        "e.preventDefault();"
         "const password=document.getElementById('ap-password').value;"
-        "if(password.length<8){showMessage('Passwort muss mindestens 8 Zeichen haben',true);return;}"
-        "fetch('/setup/ap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password})})"
+        "if(password.length<8){showMessage('Mind. 8 Zeichen',true);return false;}"
+        "fetch('/setup/ap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password,scanner:true})})"
         ".then(r=>r.json()).then(d=>{"
-        "showMessage(d.message,d.status!=='success');"
-        "if(d.status==='success'){setTimeout(()=>window.location.reload(),5000);}"
-        "}).catch(error=>{setTimeout(()=>{showMessage('AP wird eingerichtet, Seite wird neu geladen...');setTimeout(()=>window.location.reload(),5000);},2000);});"
+        "showMessage(d.message||'AP wird erstellt...',d.status!=='success');"
+        "setTimeout(()=>location.reload(),5000);"
+        "}).catch(()=>{"
+        "showMessage('AP wird erstellt...');"
+        "setTimeout(()=>location.reload(),5000);"
+        "});"
+        "return false;"
         "}"
         "function loadNetworks(){"
-        "fetch('/api/scan').then(r=>r.json()).then(d=>{"
         "const container=document.getElementById('networks');"
+        "container.innerHTML='Lade Netzwerke...';"
+        "fetch('/api/scan').then(r=>r.json()).then(d=>{"
         "container.innerHTML='';"
-        "d.networks.forEach(network=>{"
+        "d.networks.forEach(n=>{"
         "const div=document.createElement('div');"
         "div.className='network';"
-        "div.innerHTML=`<strong>${network.ssid}</strong> (${network.rssi} dBm) ${network.auth?'🔒':'🔓'}`;"
-        "div.onclick=()=>document.getElementById('wifi-ssid').value=network.ssid;"
+        "div.innerHTML='<strong>'+n.ssid+'</strong> ('+n.rssi+' dBm) '+(n.auth?'🔒':'🔓');"
+        "div.onclick=()=>document.getElementById('wifi-ssid').value=n.ssid;"
         "container.appendChild(div);"
         "});"
-        "}).catch(error=>{document.getElementById('networks').innerHTML='Fehler beim Laden der Netzwerke';});"
+        "}).catch(()=>container.innerHTML='Fehler beim Laden');"
         "}"
-        "loadNetworks();"
         "</script>"
     );
 }

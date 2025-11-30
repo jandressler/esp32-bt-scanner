@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "DeviceModeManager.h"
 
 /**
  * WebUI - Modular Web Interface Generator
@@ -14,7 +15,7 @@ class WebUI {
 public:
     // Main entry points
     static String generateMainHTML();
-    static String generateSetupHTML();
+    static String generateModeSetupHTML(const String& beaconName, const BeaconConfig& beaconConfig);
     
 private:
     // ========== CSS Styles ==========
@@ -44,8 +45,12 @@ private:
     static String buildActionFunctions();
     static String buildInitFunction();
     
-    // ========== Setup UI ==========
-    static String buildSetupStyles();
-    static String buildSetupStructure();
-    static String buildSetupScript();
+    // ========== Mode Setup UI (Beacon/WiFi/AP) ==========
+    static String buildModeSetupStyles();
+    static String buildModeSetupHeader();
+    static String buildTabButtons();
+    static String buildBeaconTab(const String& beaconName, const BeaconConfig& beaconConfig);
+    static String buildWiFiTab();
+    static String buildAPTab();
+    static String buildModeSetupScript();
 };

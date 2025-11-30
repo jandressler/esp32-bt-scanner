@@ -226,11 +226,13 @@ void BluetoothScanner::processDevice(BLEAdvertisedDevice& advertisedDevice) {
     
     int rssi = advertisedDevice.getRSSI();
     
-    // Prüfen ob Gerät bereits bekannt ist
-    bool deviceFound = false;
+    // Gerät zum DeviceManager hinzufügen/aktualisieren
+    // Dies updated Name, RSSI und lastSeen - auch für bereits bekannte Geräte
+    deviceManager->updateDevice(address.c_str(), name.c_str(), rssi);
     
-    if (!deviceFound) {
-        // Neues Gerät erstellen
+    // Erstelle Device-Struktur für weitere Analysen
+    {
+        // Device-Info sammeln
         SafeDevice newDevice = {};  // Struktur initialisieren
         strncpy(newDevice.address, address.c_str(), sizeof(newDevice.address) - 1);
         strncpy(newDevice.name, name.c_str(), sizeof(newDevice.name) - 1);
@@ -312,10 +314,7 @@ void BluetoothScanner::processDevice(BLEAdvertisedDevice& advertisedDevice) {
         // Payload-Daten immer speichern
         strncpy(newDevice.payloadHex, allPayloadData.c_str(), sizeof(newDevice.payloadHex) - 1);
         
-        // Gerät zum DeviceManager hinzufügen/aktualisieren
-        deviceManager->updateDevice(address.c_str(), name.c_str(), rssi);
-        
-        // Hersteller-Informationen und Payload-Daten immer aktualisieren
+        // Hersteller-Informationen und Payload-Daten aktualisieren
         deviceManager->updateManufacturerInfo(address.c_str(), newDevice.manufacturer, newDevice.deviceType, newDevice.manufacturerId, newDevice.payloadHex);
         
         totalDevicesSeen++;
