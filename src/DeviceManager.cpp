@@ -118,12 +118,32 @@ bool DeviceManager::isKnownDevice(const char* address) {
 }
 
 void DeviceManager::updateDevice(const char* address, const char* name, int rssi) {
-    // Ever-seen tracking: Simple Hash über MAC-Adresse
+    // Ever-seen tracking: Verwende die letzten 3 Bytes der MAC-Adresse direkt
+    // MAC: XX:XX:XX:YY:YY:YY -> Nutze YY:YY:YY (24 bits)
+    // Dies gibt 256 trackbare eindeutige Adressen bei minimalen Kollisionen
     uint32_t hash = 0;
+    int colonCount = 0;
+    
+    // Parse MAC-Adresse und extrahiere letzte 3 Bytes (XX:XX:XX:YY:YY:YY)
     for (int i = 0; address[i] != '\0'; i++) {
-        hash = hash * 31 + (uint8_t)address[i];
+        if (address[i] == ':') {
+            colonCount++;
+        } else if (colonCount >= 3) {  // Nach dem 3. Doppelpunkt
+            // Konvertiere Hex-Char zu Nibble
+            uint8_t nibble = 0;
+            if (address[i] >= '0' && address[i] <= '9') {
+                nibble = address[i] - '0';
+            } else if (address[i] >= 'a' && address[i] <= 'f') {
+                nibble = address[i] - 'a' + 10;
+            } else if (address[i] >= 'A' && address[i] <= 'F') {
+                nibble = address[i] - 'A' + 10;
+            }
+            hash = (hash << 4) | nibble;
+        }
     }
-    uint8_t bitIndex = hash % 256;
+    
+    // Nutze nur 8 Bits für Bitfeld (256 Slots)
+    uint8_t bitIndex = (uint8_t)(hash & 0xFF);
     uint8_t arrayIndex = bitIndex / 32;
     uint8_t bitPosition = bitIndex % 32;
     

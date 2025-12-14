@@ -75,9 +75,17 @@ void WebServerManager::setupMainServerRoutes() {
             handleModeSetup(request);
             return;
         }
+        
+        // Memory-Guard: Prüfe ob genug Heap für HTML-Generierung
+        if (ESP.getFreeHeap() < 60000) {  // Mindestens 60KB für HTML
+            request->send(503, "text/plain", "Service temporarily unavailable - low memory");
+            return;
+        }
+        
         // Chunked response um Heap-Probleme zu vermeiden
         AsyncResponseStream *response = request->beginResponseStream("text/html");
         response->addHeader("Connection", "close");
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->print(WebUI::buildHTMLHeader());
         response->print(WebUI::buildStyles());
         response->print("</head><body><div class=\"container\">");
@@ -124,9 +132,18 @@ void WebServerManager::setupMainServerRoutes() {
         handleSystemReboot(request);
     });
 
-    // Health check endpoint
+    // Health check endpoint with detailed info
     server->on("/health", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(200, "text/plain", "ok");
+        JsonDocument doc;
+        doc["status"] = "ok";
+        doc["heap_free"] = ESP.getFreeHeap();
+        doc["heap_min"] = ESP.getMinFreeHeap();
+        doc["uptime_ms"] = millis();
+        
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        response->addHeader("Connection", "close");
+        serializeJson(doc, *response);
+        request->send(response);
     });
 
     // Redirect unknown paths to root to avoid blank pages
@@ -171,7 +188,9 @@ void WebServerManager::setupMainServerRoutes() {
             }
             if (present) break;
         }
-        request->send(200, "text/plain", present ? "present" : "absent");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", present ? "present" : "absent");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 
     server->on("/loxone/presence_num", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -190,25 +209,33 @@ void WebServerManager::setupMainServerRoutes() {
             }
             if (present) break;
         }
-        request->send(200, "text/plain", present ? "1" : "0");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", present ? "1" : "0");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 
     server->on("/loxone/status", HTTP_GET, [this](AsyncWebServerRequest *request){
         // Text: "online" oder "error"
         bool ok = wifiManager.isConnected();
-        request->send(200, "text/plain", ok ? "online" : "error");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", ok ? "online" : "error");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 
     server->on("/loxone/status_num", HTTP_GET, [this](AsyncWebServerRequest *request){
         // Numeric: 1 = online, 0 = error
         bool ok = wifiManager.isConnected();
-        request->send(200, "text/plain", ok ? "1" : "0");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", ok ? "1" : "0");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 
     server->on("/loxone/device", HTTP_GET, [this](AsyncWebServerRequest *request){
         // Text: "present", "absent", "unknown"
         if (!request->hasParam("address")) {
-            request->send(400, "text/plain", "unknown");
+            AsyncWebServerResponse *response = request->beginResponse(400, "text/plain", "unknown");
+            response->addHeader("Connection", "close");
+            request->send(response);
             return;
         }
         String address = request->getParam("address")->value();
@@ -221,17 +248,23 @@ void WebServerManager::setupMainServerRoutes() {
             }
         }
         if (found == -1) {
-            request->send(200, "text/plain", "unknown");
+            AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "unknown");
+            response->addHeader("Connection", "close");
+            request->send(response);
             return;
         }
         bool present = devices[found].isActive && devices[found].isKnown && devices[found].rssi >= devices[found].rssiThreshold;
-        request->send(200, "text/plain", present ? "present" : "absent");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", present ? "present" : "absent");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 
     server->on("/loxone/device_num", HTTP_GET, [this](AsyncWebServerRequest *request){
         // Numeric: 1 = present, 0 = absent, -1 = unknown
         if (!request->hasParam("address")) {
-            request->send(400, "text/plain", "-1");
+            AsyncWebServerResponse *response = request->beginResponse(400, "text/plain", "-1");
+            response->addHeader("Connection", "close");
+            request->send(response);
             return;
         }
         String address = request->getParam("address")->value();
@@ -244,15 +277,32 @@ void WebServerManager::setupMainServerRoutes() {
             }
         }
         if (found == -1) {
-            request->send(200, "text/plain", "-1");
+            AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "-1");
+            response->addHeader("Connection", "close");
+            request->send(response);
             return;
         }
         bool present = devices[found].isActive && devices[found].isKnown && devices[found].rssi >= devices[found].rssiThreshold;
-        request->send(200, "text/plain", present ? "1" : "0");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", present ? "1" : "0");
+        response->addHeader("Connection", "close");
+        request->send(response);
     });
 }
 
 void WebServerManager::handleScanNetworks(AsyncWebServerRequest *request) {
+    // Memory-Guard: Prüfe ob genug Heap verfügbar ist für WiFi-Scan
+    if (ESP.getFreeHeap() < 80000) {  // Mindestens 80KB für WiFi-Scan
+        JsonDocument doc;
+        doc["status"] = "error";
+        doc["message"] = "Nicht genug Speicher für WLAN-Scan";
+        
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        response->addHeader("Connection", "close");
+        serializeJson(doc, *response);
+        request->send(response);
+        return;
+    }
+    
     JsonDocument doc;
     doc["status"] = "success";
     
