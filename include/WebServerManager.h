@@ -35,6 +35,11 @@ private:
     bool isInSecureMode;
     bool setupComplete;
     
+    // Rate limiting für HTML-Requests (gegen Mobile-Browser Overload)
+    unsigned long lastHtmlRequestStart;
+    unsigned long lastHtmlRequestComplete;
+    int htmlRequestCount;
+    
 public:
     WebServerManager();
     ~WebServerManager();

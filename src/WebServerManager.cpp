@@ -7,7 +7,7 @@
 
 extern WiFiManager wifiManager;
 
-WebServerManager::WebServerManager() : server(nullptr), setupServer(nullptr), dnsServer(nullptr), deviceManager(nullptr), bluetoothScanner(nullptr), modeManager(nullptr), isRunning(false), setupServerStarted(false), isInSecureMode(false), setupComplete(false) {}
+WebServerManager::WebServerManager() : server(nullptr), setupServer(nullptr), dnsServer(nullptr), deviceManager(nullptr), bluetoothScanner(nullptr), modeManager(nullptr), isRunning(false), setupServerStarted(false), isInSecureMode(false), setupComplete(false), lastHtmlRequestStart(0), lastHtmlRequestComplete(0), htmlRequestCount(0) {}
 
 WebServerManager::~WebServerManager() { end(); }
 
@@ -76,8 +76,22 @@ void WebServerManager::setupMainServerRoutes() {
             return;
         }
         
+        unsigned long now = millis();
+        
+        // TIME-BASED BLOCKING: Mindestens 500ms zwischen HTML-Requests
+        // Mobile Browser senden parallele Requests in <100ms → werden geblockt
+        // Desktop Browser (normales Klicken) ist nicht betroffen
+        if (now - lastHtmlRequestStart < 500) {
+            request->send(503, "text/plain", "Server busy - too many requests");
+            return;
+        }
+        
+        lastHtmlRequestStart = now;
+        
         // Memory-Guard: Prüfe ob genug Heap für HTML-Generierung
-        if (ESP.getFreeHeap() < 60000) {  // Mindestens 60KB für HTML
+        // Normal: ~78KB Heap, kritisch bei <60KB
+        uint32_t freeHeap = ESP.getFreeHeap();
+        if (freeHeap < 68000) {  // Erhöht auf 68KB für mehr Sicherheit
             request->send(503, "text/plain", "Service temporarily unavailable - low memory");
             return;
         }
@@ -86,19 +100,36 @@ void WebServerManager::setupMainServerRoutes() {
         AsyncResponseStream *response = request->beginResponseStream("text/html");
         response->addHeader("Connection", "close");
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        
+        // Heap während Generierung prüfen
         response->print(WebUI::buildHTMLHeader());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print(WebUI::buildStyles());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print("</head><body><div class=\"container\">");
         response->print(WebUI::buildPageHeader());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print(WebUI::buildControlsSection());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print(WebUI::buildDevicesSection());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print(WebUI::buildKnownDevicesSection());
+        if (ESP.getFreeHeap() < 65000) { request->send(503, "text/plain", "OOM"); return; }
+        
         response->print(WebUI::buildOutputLogSection());
         response->print("</div>");
         response->print(WebUI::buildNotificationContainer());
         response->print(WebUI::buildMainScript());
         response->print(WebUI::buildHTMLFooter());
+        
         request->send(response);
+        
+        lastHtmlRequestComplete = millis();
     });
     
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -291,7 +322,7 @@ void WebServerManager::setupMainServerRoutes() {
 
 void WebServerManager::handleScanNetworks(AsyncWebServerRequest *request) {
     // Memory-Guard: Prüfe ob genug Heap verfügbar ist für WiFi-Scan
-    if (ESP.getFreeHeap() < 80000) {  // Mindestens 80KB für WiFi-Scan
+    if (ESP.getFreeHeap() < 70000) {  // Mindestens 70KB für WiFi-Scan
         JsonDocument doc;
         doc["status"] = "error";
         doc["message"] = "Nicht genug Speicher für WLAN-Scan";

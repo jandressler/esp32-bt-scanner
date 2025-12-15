@@ -3,6 +3,7 @@
 BT Scanner Device Monitor
 Überwacht ein ESP32-BT-Scanner-Gerät und protokolliert wichtige Metriken.
 Erkennt Memory-Leaks, Neustarts und Anomalien.
+--ip xxx.xxx.xxx.xxx --interval 5 --log monitor.log
 """
 
 import requests
