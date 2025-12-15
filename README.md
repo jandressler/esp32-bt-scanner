@@ -25,6 +25,7 @@ Kompaktes ESP32-C3 System zum Scannen von Bluetooth-Geräten mit Web-Oberfläche
 - **Moderne Oberfläche**: Schlanke UI mit klarer Typografie
 - **Dialog-Overlays**: Geräteverwaltung mit RSSI-Threshold-Einstellung
 - **Payload-Hex-Dump**: Vollständige BLE-Advertising-Daten für Entwickler
+- **Stabilitätsschutz**: 500ms Zeit-Lock zwischen HTML-Requests verhindert OOM-Crashes durch parallele Mobile-Browser-Anfragen (HTTP 503 bei zu schnellen Requests)
 
 ### 📊 Geräteverwaltung
 - **Aktive Geräte**: Bis zu 32 gleichzeitig gescannte BLE-Geräte (LRU-Ersetzung)
