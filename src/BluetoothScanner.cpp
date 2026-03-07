@@ -5,6 +5,11 @@
 
 #include "BluetoothScanner.h"
 
+// ESP-IDF Coexistence API
+extern "C" {
+    #include "esp_coexist.h"
+}
+
 // =================== SafeAdvertisedDeviceCallbacks Implementation ===================
 
 void SafeAdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice advertisedDevice) {
@@ -20,7 +25,8 @@ BluetoothScanner::BluetoothScanner()
       lastScanTime(0), lastSuccessfulScan(0), lastBluetoothReset(0),
       scanStartTime(0), scanCycleActive(false),
       failedScansCount(0), currentlyScanning(false), initialized(false),
-      sessionStartTime(0), totalDevicesSeen(0) {
+    sessionStartTime(0), totalDevicesSeen(0),
+    currentScanWindow(99), currentPreferWifi(false) {
 }
 
 BluetoothScanner::~BluetoothScanner() {
@@ -57,7 +63,7 @@ bool BluetoothScanner::begin(DeviceManager* devMgr) {
     // Scanner konfigurieren
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);
-    pBLEScan->setWindow(99);
+    pBLEScan->setWindow(99);  // Client mode default
     
     sessionStartTime = millis();
     initialized = true;
@@ -85,6 +91,23 @@ void BluetoothScanner::end() {
     
     initialized = false;
     BT_DEBUG_PRINTF("BT-Scan: Beendet\n");
+}
+
+void BluetoothScanner::applyWiFiCoexProfile(bool preferWifi, uint16_t scanWindowMs) {
+    if (!initialized || !pBLEScan) return;
+
+    if (scanWindowMs < 10) scanWindowMs = 10;
+    if (scanWindowMs > 99) scanWindowMs = 99;
+
+    if (currentPreferWifi != preferWifi) {
+        esp_coex_preference_set(preferWifi ? ESP_COEX_PREFER_WIFI : ESP_COEX_PREFER_BALANCE);
+        currentPreferWifi = preferWifi;
+    }
+
+    if (currentScanWindow != scanWindowMs) {
+        pBLEScan->setWindow(scanWindowMs);
+        currentScanWindow = scanWindowMs;
+    }
 }
 
 void BluetoothScanner::performScan() {

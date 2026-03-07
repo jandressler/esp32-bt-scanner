@@ -686,6 +686,8 @@ void WebServerManager::handleSetupWiFi(AsyncWebServerRequest *request, uint8_t *
         }
         
         if (success) {
+            // WiFi client mode selected: clear AP password to avoid mode ambiguity
+            wifiManager.clearAPPassword();
             sendJSONResponse(request, "success", "WiFi verbunden! IP: " + wifiManager.getLocalIP());
             // Nach erfolgreicher Verbindung Haupt-Routen aktivieren
             this->end();
@@ -732,6 +734,8 @@ void WebServerManager::handleSetupAP(AsyncWebServerRequest *request, uint8_t *da
         }
         
         if (wifiManager.setAPPassword(password)) {
+            // AP mode selected: clear STA credentials to force AP mode after reboot
+            wifiManager.clearWiFiCredentials();
             sendJSONResponse(request, "success", "AP-Passwort gesetzt, System startet neu...");
             delay(100);
             ESP.restart();

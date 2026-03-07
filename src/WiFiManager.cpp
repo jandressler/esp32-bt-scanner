@@ -40,6 +40,9 @@ bool WiFiManager::begin() {
 bool WiFiManager::connectToWiFi() {
     if (savedSSID.length() == 0) return false;
     
+    // Prevent flash writes during WiFi operations
+    WiFi.persistent(false);
+    
     WiFi.mode(WIFI_STA);
     
     // Konfiguriere statische IP falls aktiviert
@@ -62,7 +65,7 @@ bool WiFiManager::connectToWiFi() {
     if (WiFi.status() == WL_CONNECTED) {
         isInSecureMode = true;
         
-        // Enable WiFi power save for reduced consumption
+        // Enable WiFi power save for client mode stability
         WiFi.setSleep(WIFI_PS_MIN_MODEM);
         
         // Reduce CPU frequency to 80MHz
@@ -83,6 +86,9 @@ bool WiFiManager::connectToWiFi() {
 }
 
 bool WiFiManager::startAccessPoint(const String& apPassword) {
+    // Prevent flash writes during WiFi operations
+    WiFi.persistent(false);
+    
     WiFi.mode(WIFI_AP);
     
     bool success;
@@ -97,11 +103,14 @@ bool WiFiManager::startAccessPoint(const String& apPassword) {
     }
     
     if (success) {
-        // Enable WiFi power save also in AP mode
-        WiFi.setSleep(WIFI_PS_MIN_MODEM);
+        // Disable WiFi modem sleep for BLE coexistence stability
+        WiFi.setSleep(WIFI_PS_NONE);
         
         // Reduce CPU frequency to 80MHz
         setCpuFrequencyMhz(80);
+        
+        // Reduce TX power for stability and heat reduction
+        WiFi.setTxPower(WIFI_POWER_15dBm);
         
         // Start DNS Server for Captive Portal
         if (!dnsServer) {
@@ -141,6 +150,34 @@ bool WiFiManager::saveAPPassword(const String& password) {
     savedAPPassword = password;
     updateSecurityStatus();
     
+    return true;
+}
+
+bool WiFiManager::clearWiFiCredentials() {
+    preferences.begin("wifi", false);
+    preferences.remove("ssid");
+    preferences.remove("password");
+    preferences.remove("use_static_ip");
+    preferences.remove("static_ip");
+    preferences.remove("gateway");
+    preferences.remove("subnet");
+    preferences.remove("dns");
+    preferences.end();
+
+    savedSSID = "";
+    savedPassword = "";
+    useStaticIP = false;
+    updateSecurityStatus();
+    return true;
+}
+
+bool WiFiManager::clearAPPassword() {
+    preferences.begin("wifi", false);
+    preferences.remove("ap_password");
+    preferences.end();
+
+    savedAPPassword = "";
+    updateSecurityStatus();
     return true;
 }
 

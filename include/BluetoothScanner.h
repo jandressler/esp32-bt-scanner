@@ -52,6 +52,10 @@ private:
     // Statistics
     unsigned long sessionStartTime;
     int totalDevicesSeen;
+
+    // Coexistence state
+    uint16_t currentScanWindow;
+    bool currentPreferWifi;
     
 public:
     BluetoothScanner();
@@ -61,6 +65,9 @@ public:
     bool begin(DeviceManager* devMgr);
     void end();
     bool isInitialized() const { return initialized; }
+
+    // Coexistence tuning (AP vs Client)
+    void applyWiFiCoexProfile(bool preferWifi, uint16_t scanWindowMs);
     
     // Scanning
     void performScan();

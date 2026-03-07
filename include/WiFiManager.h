@@ -53,6 +53,8 @@ public:
     // Configuration Management
     bool saveWiFiCredentials(const String& ssid, const String& password);
     bool saveAPPassword(const String& password);
+    bool clearWiFiCredentials();
+    bool clearAPPassword();
     void clearAllSettings();
     
     // Setup Methods

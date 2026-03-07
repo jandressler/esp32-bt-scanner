@@ -211,6 +211,8 @@ void loop() {
     
     // Bluetooth scanning only in secure mode
     if (systemInitialized && wifiManager.isSecure() && bluetoothScanner.isInitialized()) {
+        bool apMode = wifiManager.isInAPMode();
+        bluetoothScanner.applyWiFiCoexProfile(apMode, apMode ? 40 : 99);
         bluetoothScanner.performAutomaticScanCycle();  // Automatischer 2s/8s Zyklus
         updateLEDStatus();
     }
